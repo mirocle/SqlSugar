@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 
 namespace SqlSugar.TDengine
@@ -119,12 +120,19 @@ namespace SqlSugar.TDengine
         public override void NoExistLogic(EntityInfo entityInfo)
         {
             List<DbColumnInfo> dbColumns = new List<DbColumnInfo>();
-            foreach (var item in entityInfo.Columns.Where(it=>it.PropertyName!= "TagsTypeId").OrderBy(it=>it.UnderType==typeof(DateTime)?0:1))
+            foreach (var item in entityInfo.Columns.Where(it=>it.IsIgnore!=true).Where(it=>it.PropertyName!= "TagsTypeId").OrderBy(it=>it.UnderType==typeof(DateTime)?0:1))
             {
                 var addItem = EntityColumnToDbColumn(entityInfo, entityInfo.DbTableName, item);
                 dbColumns.Add(addItem);
             }
+            var attr = entityInfo.Type.GetCustomAttribute<STableAttribute>();
+            var oldTableName = entityInfo.DbTableName;
+            if (attr != null) 
+            {
+                entityInfo.DbTableName += ("{stable}"+this.Context.Utilities.SerializeObject(attr));
+            }
             this.Context.DbMaintenance.CreateTable(entityInfo.DbTableName, dbColumns);
+            entityInfo.DbTableName = oldTableName;
         }
         protected override DbColumnInfo EntityColumnToDbColumn(EntityInfo entityInfo, string tableName, EntityColumnInfo item)
         {
@@ -157,6 +165,7 @@ namespace SqlSugar.TDengine
                 case "double":
                     return "DOUBLE";
                 case "float":
+                case "single":
                     return "FLOAT";
                 case "int":
                     return "INT";
@@ -167,14 +176,17 @@ namespace SqlSugar.TDengine
                 case "int64":
                     return "BIGINT";
                 case "uint":
+                case "uint32":
                     return "INT UNSIGNED";
                 case "long":
                     return "BIGINT";
                 case "ulong":
+                case "uint64":
                     return "BIGINT UNSIGNED";
                 case "short":
                     return "SMALLINT";
                 case "ushort":
+                case "uint16":
                     return "SMALLINT UNSIGNED";
                 case "string":
                     return "VARCHAR";

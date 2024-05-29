@@ -267,6 +267,34 @@ namespace SqlSugar
         #endregion
 
         #region Methods
+        public override bool UpdateColumn(string tableName, DbColumnInfo column)
+        {
+            ConvertCreateColumnInfo(column);
+            var oldColumn = this.Context.DbMaintenance.GetColumnInfosByTableName(tableName, false)
+                .FirstOrDefault(it => it.DbColumnName.EqualCase(column.DbColumnName));
+            if (oldColumn != null)
+            {
+                if (oldColumn.IsNullable == column.IsNullable)
+                {
+                    var sql = GetUpdateColumnSqlOnlyType(tableName, column);
+                    this.Context.Ado.ExecuteCommand(sql);
+                    return true;
+                }
+            }
+            return base.UpdateColumn(tableName, column);
+        }
+        protected virtual string GetUpdateColumnSqlOnlyType(string tableName, DbColumnInfo columnInfo)
+        {
+            string columnName = this.SqlBuilder.GetTranslationColumnName(columnInfo.DbColumnName);
+            tableName = this.SqlBuilder.GetTranslationTableName(tableName);
+            string dataSize = GetSize(columnInfo);
+            string dataType = columnInfo.DataType;
+            string nullType = "";
+            string primaryKey = null;
+            string identity = null;
+            string result = string.Format(this.AlterColumnToTableSql, tableName, columnName, dataType, dataSize, nullType, primaryKey, identity);
+            return result;
+        }
         public override List<string> GetDbTypes()
         {
             var result = this.Context.Ado.SqlQuery<string>(@"SELECT DISTINCT DATA_TYPE
@@ -334,7 +362,12 @@ WHERE table_name = '" + tableName + "'");
         }
         public override bool CreateDatabase(string databaseDirectory = null)
         {
-            throw new NotSupportedException();
+            if (this.Context.Ado.IsValidConnection())
+            {
+                return true;
+            }
+            Check.ExceptionEasy("dm no support create database ", "达梦不支持建库方法，请写有效连接字符串可以正常运行该方法。");
+            return true;
         }
         public override bool CreateDatabase(string databaseName, string databaseDirectory = null)
         {
@@ -382,6 +415,15 @@ WHERE table_name = '" + tableName + "'");
             }
             return true;
         }
+
+        public override bool AddTableRemark(string tableName, string description)
+        {
+            return base.AddTableRemark(SqlBuilder.GetTranslationColumnName(tableName), description);
+        }
+        public override bool AddColumnRemark(string columnName, string tableName, string description)
+        {
+            return base.AddColumnRemark(SqlBuilder.GetTranslationColumnName(columnName), SqlBuilder.GetTranslationColumnName(tableName), description);
+        }
         public override List<DbColumnInfo> GetColumnInfosByTableName(string tableName, bool isCache = true)
         {
             string cacheKey = "DbMaintenanceProvider.GetColumnInfosByTableName." + this.SqlBuilder.GetNoTranslationColumnName(tableName).ToLower();
@@ -426,6 +468,16 @@ WHERE table_name = '" + tableName + "'");
                         Length = row["ColumnSize"].ObjToInt(),
                         Scale = row["numericscale"].ObjToInt()
                     };
+                    if (column.DataType.EqualCase("number")|| column.DataType.EqualCase("decimal"))
+                    {
+                        column.Length = row["numericprecision"].ObjToInt();
+                        column.Scale = row["numericscale"].ObjToInt();
+                        column.DecimalDigits = row["numericscale"].ObjToInt();
+                        if (column.Length == 38 && column.Scale == 0)
+                        {
+                            column.Length = 22;
+                        }
+                    }
                     result.Add(column);
                 }
                 return result;
@@ -497,6 +549,7 @@ WHERE table_name = '" + tableName + "'");
             {
                 foreach (var item in columns)
                 {
+                    ConvertCreateColumnInfo(item);
                     if (item.DbColumnName.Equals("GUID", StringComparison.CurrentCultureIgnoreCase) && item.Length == 0)
                     {
                         item.Length = 10;
@@ -553,6 +606,15 @@ WHERE upper(t.TABLE_NAME) = upper('{tableName}')
                 {
                     return this.Context.CurrentConnectionConfig.MoreSettings.IsAutoToUpper == true;
                 }
+            }
+        }
+        private static void ConvertCreateColumnInfo(DbColumnInfo x)
+        {
+            string[] array = new string[] { "int" };
+            if (array.Contains(x.DataType?.ToLower()))
+            {
+                x.Length = 0;
+                x.DecimalDigits = 0;
             }
         }
         #endregion

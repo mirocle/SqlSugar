@@ -6,8 +6,8 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
-using SqlSugar; 
-using TDengineDriver; 
+using SqlSugar;
+using SqlSugar.DbConvert;
 
 namespace TDengineTest
 {
@@ -27,6 +27,16 @@ namespace TDengineTest
                     {
                         Console.WriteLine(UtilMethods.GetNativeSql(sql, p));
                     }
+                },
+                ConfigureExternalServices = new ConfigureExternalServices()
+                {
+                     EntityService= (property, column) =>
+                     {
+                         if (column.SqlParameterDbType == null) 
+                         {
+                             column.SqlParameterDbType = typeof(CommonPropertyConvert);
+                         }
+                     }
                 }
             });
 

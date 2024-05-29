@@ -105,7 +105,7 @@ namespace SqlSugar
         {
             await ScopedContext.BeginTranAsync(iso);
         }
-        public void ChangeDatabase(dynamic configId)
+        public void ChangeDatabase(object configId)
         {
             ScopedContext.ChangeDatabase(configId);
         }
@@ -172,11 +172,11 @@ namespace SqlSugar
             ScopedContext.Dispose();
         }
 
-        public SqlSugarProvider GetConnection(dynamic configId)
+        public SqlSugarProvider GetConnection(object configId)
         {
             return ScopedContext.GetConnection(configId);
         }
-        public SqlSugarScopeProvider GetConnectionScope(dynamic configId)
+        public SqlSugarScopeProvider GetConnectionScope(object configId)
         {
             return ScopedContext.GetConnectionScope(configId);
         }
@@ -472,6 +472,10 @@ namespace SqlSugar
         {
             return ScopedContext.Queryable(queryable);
         }
+        public ISugarQueryable<T> Queryable<T>(ISugarQueryable<T> queryable, string shortName)
+        {
+            return ScopedContext.Queryable(queryable, shortName);
+        }
 
         public ISugarQueryable<T> Queryable<T>(string shortName)
         {
@@ -613,7 +617,10 @@ namespace SqlSugar
         {
             return ScopedContext.Storageable(dataList);
         }
-
+        public IStorageable<T> Storageable<T>(IList<T> dataList) where T : class, new()
+        {
+            return ScopedContext.Storageable(dataList?.ToList());
+        }
         public IStorageable<T> Storageable<T>(T data) where T : class, new()
         {
             return ScopedContext.Storageable(data);
@@ -627,28 +634,32 @@ namespace SqlSugar
             return this.ScopedContext.StorageableByObject(singleEntityObjectOrListObject);
         }
 
-        public ISugarQueryable<T> Union<T>(List<ISugarQueryable<T>> queryables) where T : class, new()
+        public ISugarQueryable<T> Union<T>(List<ISugarQueryable<T>> queryables) where T : class
         {
             return ScopedContext.Union(queryables);
         }
 
-        public ISugarQueryable<T> Union<T>(params ISugarQueryable<T>[] queryables) where T : class, new()
+        public ISugarQueryable<T> Union<T>(params ISugarQueryable<T>[] queryables) where T : class
         {
             return ScopedContext.Union(queryables);
         }
 
-        public ISugarQueryable<T> UnionAll<T>(List<ISugarQueryable<T>> queryables) where T : class, new()
+        public ISugarQueryable<T> UnionAll<T>(List<ISugarQueryable<T>> queryables) where T : class
         {
             return ScopedContext.UnionAll(queryables);
         }
 
-        public ISugarQueryable<T> UnionAll<T>(params ISugarQueryable<T>[] queryables) where T : class, new()
+        public ISugarQueryable<T> UnionAll<T>(params ISugarQueryable<T>[] queryables) where T : class
         {
             return ScopedContext.UnionAll(queryables);
         }
         public UpdateMethodInfo UpdateableByObject(object singleEntityObjectOrListObject)
         {
             return ScopedContext.UpdateableByObject(singleEntityObjectOrListObject);
+        }
+        public UpdateExpressionMethodInfo UpdateableByObject(Type entityType)
+        {
+            return ScopedContext.UpdateableByObject(entityType);
         }
         public IUpdateable<Dictionary<string, object>> UpdateableByDynamic(object updateDynamicObject)
         {
@@ -733,7 +744,7 @@ namespace SqlSugar
             return ScopedContext.UseTranAsync(action, errorCallBack);
         }
 
-        public bool IsAnyConnection(dynamic configId)
+        public bool IsAnyConnection(object configId)
         {
             return ScopedContext.IsAnyConnection(configId);
         }

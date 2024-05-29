@@ -33,7 +33,9 @@ namespace SqlSugar
                     resultConnector.CharacterSet = this.CharacterSet;
                     return resultConnector;
                 case DbType.Dm:
-                    return new DmFastBuilder();
+                    var result3= new DmFastBuilder();
+                    result3.DbFastestProperties.IsOffIdentity = this.IsOffIdentity;
+                    return result3;
                 case DbType.ClickHouse:
                     var resultConnectorClickHouse = InstanceFactory.CreateInstance<IFastBuilder>("SqlSugar.ClickHouse.ClickHouseFastBuilder");
                     resultConnectorClickHouse.CharacterSet = this.CharacterSet;
@@ -42,6 +44,8 @@ namespace SqlSugar
                     break;
                 case DbType.Oscar:
                     break;
+                case DbType.QuestDB:
+                    return new QuestDBFastBuilder(this.entityInfo); 
                 default:
                     break;
             }
@@ -101,7 +105,7 @@ namespace SqlSugar
                     {
                         name = column.PropertyName;
                     }
-                    var value = ValueConverter(column, PropertyCallAdapterProvider<T>.GetInstance(column.PropertyName).InvokeGet(item));
+                    var value = ValueConverter(column, GetValue(item,column));
                     if (column.SqlParameterDbType != null&& column.SqlParameterDbType is Type && UtilMethods.HasInterface((Type)column.SqlParameterDbType, typeof(ISugarDataConverter))) 
                     {
                         var columnInfo = column;
@@ -153,6 +157,18 @@ namespace SqlSugar
 
             return dt;
         }
+        private static object GetValue(T item, EntityColumnInfo column)
+        {
+            if (StaticConfig.EnableAot)
+            {
+                return column.PropertyInfo.GetValue(item);
+            }
+            else
+            {
+                return PropertyCallAdapterProvider<T>.GetInstance(column.PropertyName).InvokeGet(item);
+            }
+        }
+
         private string GetTableName()
         {
             if (this.AsName.HasValue())
@@ -196,6 +212,11 @@ namespace SqlSugar
         }
         private DataTable GetCopyWriteDataTable(DataTable dt)
         {
+            var builder = GetBuider();
+            if (builder.DbFastestProperties?.IsNoCopyDataTable == true) 
+            {
+                return dt;
+            }
             DataTable tempDataTable = null;
             if (AsName == null)
             {
@@ -246,11 +267,11 @@ namespace SqlSugar
             DataTable tempDataTable = null;
             if (AsName == null)
             {
-                tempDataTable = queryable.Where(it => false).Select(string.Join(",", dts)).ToDataTable();
+                tempDataTable = queryable.Clone().Where(it => false).Select(string.Join(",", dts)).ToDataTable();
             }
             else
             {
-                tempDataTable = queryable.AS(AsName).Where(it => false).Select(string.Join(",", dts)).ToDataTable();
+                tempDataTable = queryable.Clone().AS(AsName).Where(it => false).Select(string.Join(",", dts)).ToDataTable();
             };
             List<string> uInt64TypeName = new List<string>();
             foreach (DataColumn item in tempDataTable.Columns)

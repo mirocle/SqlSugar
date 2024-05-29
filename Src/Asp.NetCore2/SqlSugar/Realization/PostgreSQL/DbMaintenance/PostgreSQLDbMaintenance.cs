@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-
+ 
 namespace SqlSugar
 {
     public class PostgreSQLDbMaintenance : DbMaintenanceProvider
@@ -63,17 +63,14 @@ namespace SqlSugar
 						 pg_namespace n on n.oid = c.relnamespace and nspname='" + schema + @"'
                          inner join 
                          pg_tables z on z.tablename=c.relname
-                        where  relkind in('p', 'r') and relname not like 'pg_%' and relname not like 'sql_%' and schemaname='" + schema + "' order by relname";
+                        where  relkind in('p', 'r') and relname not like 'pg\_%' and relname not like 'sql\_%' and schemaname='" + schema + "' order by relname";
             }
         }
         protected override string GetViewInfoListSql
         {
             get
             {
-                return @"select cast(relname as varchar) as Name,cast(Description as varchar) from pg_description
-                         join pg_class on pg_description.objoid = pg_class.oid
-                         where objsubid = 0 and relname in (SELECT viewname from pg_views  
-                         WHERE schemaname ='"+GetSchema()+"')";
+                return @"select  table_name as name  from information_schema.views where table_schema  ='" + GetSchema()+"' ";
             }
         }
         #endregion
@@ -182,7 +179,7 @@ namespace SqlSugar
 
         protected override string IsAnyTableRemarkSql { get { throw new NotSupportedException(); } }
 
-        protected override string RenameTableSql => "alter table  {0} to {1}";
+        protected override string RenameTableSql => "alter table  {0} rename to {1}";
 
         protected override string CreateIndexSql
         {
@@ -280,7 +277,7 @@ WHERE tgrelid = '"+tableName+"'::regclass");
         }
         public override List<string> GetIndexList(string tableName)
         {
-            var sql = $"SELECT indexname, indexdef FROM pg_indexes WHERE upper(tablename) = upper('{tableName}')";
+            var sql = $"SELECT indexname, indexdef FROM pg_indexes WHERE upper(tablename) = upper('{tableName}') AND upper(schemaname) = upper('{GetSchema()}')";
             return this.Context.Ado.SqlQuery<string>(sql);
         }
         public override List<string> GetProcList(string dbName)
@@ -312,6 +309,12 @@ WHERE tgrelid = '"+tableName+"'::regclass");
                 return base.AddDefaultValue(this.SqlBuilder.GetTranslationTableName(tableName), this.SqlBuilder.GetTranslationTableName(columnName), defaultValue);
             }
         }
+
+        public override bool RenameTable(string oldTableName, string newTableName)
+        {
+            return base.RenameTable(this.SqlBuilder.GetTranslationTableName(oldTableName), this.SqlBuilder.GetTranslationTableName(newTableName));
+        }
+
         public override bool AddColumnRemark(string columnName, string tableName, string description)
         {
             tableName = this.SqlBuilder.GetTranslationTableName(tableName);
@@ -326,6 +329,7 @@ WHERE tgrelid = '"+tableName+"'::regclass");
         }
         public override bool UpdateColumn(string tableName, DbColumnInfo columnInfo)
         {
+            ConvertCreateColumnInfo(columnInfo);
             tableName = this.SqlBuilder.GetTranslationTableName(tableName);
             var columnName= this.SqlBuilder.GetTranslationColumnName(columnInfo.DbColumnName);
             string sql = GetUpdateColumnSql(tableName, columnInfo);
@@ -377,7 +381,7 @@ WHERE tgrelid = '"+tableName+"'::regclass");
             });
             if (!GetDataBaseList(newDb).Any(it => it.Equals(databaseName, StringComparison.CurrentCultureIgnoreCase)))
             {
-                var isVast = this.Context?.TempItems?.ContainsKey("DbType.Vastbase")==true;
+                var isVast = this.Context?.CurrentConnectionConfig?.MoreSettings?.DatabaseModel==DbType.Vastbase;
                 var dbcompatibility = "";
                 if (isVast) 
                 {
@@ -413,6 +417,7 @@ WHERE tgrelid = '"+tableName+"'::regclass");
             {
                 foreach (var item in columns)
                 {
+                    ConvertCreateColumnInfo(item);
                     if (item.DbColumnName.Equals("GUID", StringComparison.CurrentCultureIgnoreCase) && item.Length == 0)
                     {
                         item.Length = 10;
@@ -429,6 +434,15 @@ WHERE tgrelid = '"+tableName+"'::regclass");
             sql = sql.Replace("$PrimaryKey", primaryKeyInfo);
             this.Context.Ado.ExecuteCommand(sql);
             return true;
+        }
+        protected override bool IsAnyDefaultValue(string tableName, string columnName, List<DbColumnInfo> columns)
+        {
+            var defaultValue = columns.Where(it => it.DbColumnName.Equals(columnName, StringComparison.CurrentCultureIgnoreCase)).First().DefaultValue;
+            if (defaultValue?.StartsWith("NULL::") == true) 
+            {
+                return false;
+            }
+            return defaultValue.HasValue();
         }
         protected override string GetCreateTableSql(string tableName, List<DbColumnInfo> columns)
         {
@@ -563,7 +577,16 @@ WHERE tgrelid = '"+tableName+"'::regclass");
 
             return schema;
         }
+        private static void ConvertCreateColumnInfo(DbColumnInfo x)
+        {
+            string[] array = new string[] { "uuid","int4", "text", "int2", "int8", "date", "bit", "text", "timestamp" };
 
+            if (array.Contains(x.DataType?.ToLower()))
+            {
+                x.Length = 0;
+                x.DecimalDigits = 0;
+            }
+        }
         #endregion
     }
 }

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
 namespace SqlSugar
 {
     /// <summary>
@@ -147,7 +148,7 @@ namespace SqlSugar
                 }
                 else if (UtilMethods.IsParameterConverter(columnInfo))
                 {
-                    SugarParameter p = UtilMethods.GetParameterConverter(this.Context.SugarContext.Context, value, oppoSiteExpression, columnInfo);
+                    SugarParameter p = UtilMethods.GetParameterConverter(this.Context.ParameterIndex,this.Context.SugarContext.Context, value, oppoSiteExpression, columnInfo);
                     appendValue = p.ParameterName;
                     this.Context.Parameters.Add(p);
                 }
@@ -159,10 +160,23 @@ namespace SqlSugar
                 {
                     this.Context.Parameters.Add(new SugarParameter(appendValue, value) { IsArray = true });
                 }
-                else if (value!=null&&(value is Enum) &&this.Context?.SugarContext?.Context?.CurrentConnectionConfig?.MoreSettings?.TableEnumIsString == true) 
+                else if (value != null && (value is Enum) && this.Context?.SugarContext?.Context?.CurrentConnectionConfig?.MoreSettings?.TableEnumIsString == true)
                 {
-                    this.Context.Parameters.Add(new SugarParameter(appendValue,Convert.ToString(value)));
+                    this.Context.Parameters.Add(new SugarParameter(appendValue, Convert.ToString(value)));
                 }
+                else if (this.Context
+                                       ?.SugarContext
+                                       ?.Context
+                                       ?.CurrentConnectionConfig
+                                       ?.MoreSettings
+                                       ?.IsCorrectErrorSqlParameterName == true
+                                       && columnInfo?.PropertyName != null
+                                       && !columnInfo.PropertyName.IsRegexWNoContainsChinese()) 
+                {
+                    appendValue =  (Context.SqlParameterKeyWord + "p" + appendValue.GetHashCode() +"no"+ Context.ParameterIndex)
+                                   .Replace("-","");
+                    this.Context.Parameters.Add(new SugarParameter(appendValue, value));
+                } 
                 else
                 {
                     this.Context.Parameters.Add(new SugarParameter(appendValue, value));

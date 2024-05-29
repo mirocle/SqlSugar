@@ -20,6 +20,12 @@ namespace SqlSugar
     }
     public partial class SqlServerMethod : DefaultDbMethod, IDbMethods
     {
+        public override string JsonArrayLength(MethodCallExpressionModel model)
+        {
+            var parameter = model.Args[0];
+            return $" (SELECT COUNT(*) FROM OPENJSON({parameter.MemberName})) ";
+        }
+
         public override string JsonIndex(MethodCallExpressionModel model)
         {
             var parameter = model.Args[0];
@@ -53,11 +59,25 @@ namespace SqlSugar
             var parameter2 = model.Args[1];
             if (parameter.MemberName != null && parameter.MemberName is DateTime)
             {
-                return string.Format(" datepart({0},'{1}') ", parameter2.MemberValue, parameter.MemberName);
+                if (parameter2.MemberValue?.ToString() == DateType.Weekday.ToString())
+                {
+                    return string.Format(" (datepart({0},'{1}')-1) ", parameter2.MemberValue, parameter.MemberName);
+                }
+                else 
+                {
+                    return string.Format(" datepart({0},'{1}') ", parameter2.MemberValue, parameter.MemberName);
+                }
             }
             else
             {
-                return string.Format(" datepart({0},{1}) ", parameter2.MemberValue, parameter.MemberName);
+                if (parameter2.MemberValue?.ToString() == DateType.Weekday.ToString())
+                {
+                    return string.Format(" (datepart({0},{1})-1) ", parameter2.MemberValue, parameter.MemberName);
+                }
+                else
+                {
+                    return string.Format(" datepart({0},{1}) ", parameter2.MemberValue, parameter.MemberName);
+                }
             }
         }
         public override string HasValue(MethodCallExpressionModel model)

@@ -70,6 +70,24 @@ namespace SqlSugar
         {
             throw new NotSupportedException("Can only be used in expressions");
         }
+
+        public static int Rank(object orderByField, object partitionBy)
+        {
+            throw new NotSupportedException("Can only be used in expressions");
+        }
+        public static int Rank(object orderByField)
+        {
+            throw new NotSupportedException("Can only be used in expressions");
+        } 
+        public static int DenseRank(object orderByField, object partitionBy)
+        {
+            throw new NotSupportedException("Can only be used in expressions");
+        }
+        public static int DenseRank(object orderByField)
+        {
+            throw new NotSupportedException("Can only be used in expressions");
+        }
+
         public static int RowCount(object countFiledName,object orderByField, object partitionBy)
         {
             throw new NotSupportedException("Can only be used in expressions");
@@ -284,8 +302,11 @@ namespace SqlSugar
         }
         public static bool DateIsSame(DateTime date1, DateTime date2, DateType dataType) { throw new NotSupportedException("Can only be used in expressions"); }
         public static DateTime DateAdd(DateTime date, int addValue, DateType dataType) { throw new NotSupportedException("Can only be used in expressions"); }
+        public static DateTimeOffset DateAdd(DateTimeOffset date, int addValue, DateType dataType) { throw new NotSupportedException("Can only be used in expressions"); }
         public static DateTime DateAdd(DateTime date, int addValue) { throw new NotSupportedException("Can only be used in expressions"); }
+        public static DateTimeOffset DateAdd(DateTimeOffset date, int addValue) { throw new NotSupportedException("Can only be used in expressions"); }
         public static int DateValue(DateTime date, DateType dataType) { throw new NotSupportedException("Can only be used in expressions"); }
+        public static int DateValue(DateTimeOffset date, DateTimeOffset dataType) { throw new NotSupportedException("Can only be used in expressions"); }
         public static bool Between(object value, object start, object end) { throw new NotSupportedException("Can only be used in expressions"); }
         public static TResult IIF<TResult>(bool isTrue, TResult thenValue, TResult elseValue) { return isTrue ? thenValue : elseValue; }
         public static TResult IsNull<TResult>(TResult thisValue, TResult ifNullValue) { throw new NotSupportedException("Can only be used in expressions"); }

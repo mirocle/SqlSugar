@@ -245,7 +245,7 @@ namespace SqlSugar
         {
             get
             {
-                return "";
+                return " NULL ";
             } 
         }
         protected override string CreateTableNotNull
@@ -272,8 +272,27 @@ namespace SqlSugar
         #endregion
 
         #region Methods
+        public override bool IsAnyTable(string tableName, bool isCache = true)
+        {
+            if (isCache)
+            {
+                return base.IsAnyTable(tableName, isCache);
+            }
+            else 
+            {
+                if (tableName.Contains("\"")) 
+                {
+                    tableName = SqlBuilder.GetNoTranslationColumnName(tableName);
+                }
+                return this.Context.Ado.GetInt(@"
+                    SELECT COUNT(table_name)
+                    FROM user_tables
+                    WHERE UPPER(table_name) = UPPER(@p)",new { p=tableName}) > 0;
+            }
+        }
         public override bool UpdateColumn(string tableName, DbColumnInfo column)
         {
+            ConvertCreateColumnInfo(column);
             var oldColumn = this.Context.DbMaintenance.GetColumnInfosByTableName(tableName, false)
                 .FirstOrDefault(it=>it.DbColumnName.EqualCase(column.DbColumnName));
             if (oldColumn != null) 
@@ -379,7 +398,12 @@ WHERE table_name = '"+tableName+"'");
         }
         public override bool CreateDatabase(string databaseName, string databaseDirectory = null)
         {
-            throw new NotSupportedException();
+            if (this.Context.Ado.IsValidConnection())
+            {
+                return true;
+            }
+            Check.ExceptionEasy("Oracle no support create database ", "Oracle不支持建库方法，请写有效连接字符串可以正常运行该方法。");
+            return true;
         }
         public override bool AddRemark(EntityInfo entity)
         {
@@ -436,10 +460,10 @@ WHERE table_name = '"+tableName+"'");
         private List<DbColumnInfo> GetColumnInfosByTableName(string tableName)
         {
             List<DbColumnInfo> columns = GetOracleDbType(tableName);
-            string sql = "select *  /* " + Guid.NewGuid() + " */ from " +SqlBuilder.GetTranslationTableName(tableName) + " WHERE 1=2 ";
-            if (!this.GetTableInfoList(false).Any(it => it.Name == SqlBuilder.GetTranslationTableName(tableName).TrimStart('\"').TrimEnd('\"'))) 
+            string sql = "select *  /* " + Guid.NewGuid() + " */ from " +SqlBuilder.GetTranslationTableName(SqlBuilder.GetNoTranslationColumnName(tableName)) + " WHERE 1=2 ";
+            if (!IsAnyTable(tableName, false))
             {
-                sql = "select *  /* " + Guid.NewGuid() + " */ from \"" + tableName + "\" WHERE 1=2 ";
+                return new List<DbColumnInfo>();
             }
             this.Context.Utilities.RemoveCache<List<DbColumnInfo>>("DbMaintenanceProvider.GetFieldComment."+tableName);
             this.Context.Utilities.RemoveCache<List<string>>("DbMaintenanceProvider.GetPrimaryKeyByTableNames." + this.SqlBuilder.GetNoTranslationColumnName(tableName).ToLower());
@@ -580,6 +604,7 @@ WHERE table_name = '"+tableName+"'");
             {
                 foreach (var item in columns)
                 {
+                    ConvertCreateColumnInfo(item);
                     if (item.DbColumnName.Equals("GUID", StringComparison.CurrentCultureIgnoreCase) && item.Length == 0)
                     {
                         item.Length = 50;
@@ -629,6 +654,19 @@ WHERE table_name = '"+tableName+"'");
                 {
                     return this.Context.CurrentConnectionConfig.MoreSettings.IsAutoToUpper == true;
                 }
+            }
+        }
+        private static void ConvertCreateColumnInfo(DbColumnInfo x)
+        {
+            string[] array = new string[] { "int"};
+            if (array.Contains(x.DataType?.ToLower()))
+            {
+                x.Length = 0;
+                x.DecimalDigits = 0;
+            }
+            if (x.OracleDataType.HasValue()) 
+            {
+                x.DataType = x.OracleDataType;
             }
         }
         #endregion

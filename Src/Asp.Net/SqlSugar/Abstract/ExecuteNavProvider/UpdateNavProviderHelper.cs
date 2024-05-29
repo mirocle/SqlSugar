@@ -97,6 +97,10 @@ namespace SqlSugar
             {
                var pk= this._Context.EntityMaintenance.GetEntityInfo<TChild>().Columns.Where(it => it.IsPrimarykey);
                 List<string> ignoreColumns = new List<string>();
+                if (_Options?.IgnoreColumns != null) 
+                {
+                    ignoreColumns.AddRange(_Options.IgnoreColumns);
+                }
                 if (pk.Any()) 
                 {
                     ignoreColumns.AddRange(pk.Select(it=>it.PropertyName));
@@ -112,13 +116,15 @@ namespace SqlSugar
             }
             else
             {
+                var ignoreColumns = _Options?.IgnoreColumns;
+                var isIgnoreNull = _Options?.IgnoreNullColumns == true;
                 if (IsDeleted)
                 {
-                    x.AsUpdateable.PageSize(1).EnableQueryFilter().ExecuteCommand();
+                    x.AsUpdateable.IgnoreNullColumns(isIgnoreNull).IgnoreColumns(ignoreColumns?.ToArray()).PageSize(1).EnableQueryFilter().ExecuteCommand();
                 }
                 else
                 {
-                    x.AsUpdateable.ExecuteCommand();
+                    x.AsUpdateable.IgnoreNullColumns(isIgnoreNull).IgnoreColumns(ignoreColumns?.ToArray()).ExecuteCommand();
                 }
             }
             InitData(pkColumn, insertData);

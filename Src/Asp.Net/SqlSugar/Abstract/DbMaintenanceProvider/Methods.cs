@@ -37,6 +37,18 @@ namespace SqlSugar
             }
             return result;
         }
+        public List<DbTableInfo> GetTableInfoList(Func<DbType,string, string> getChangeSqlFunc)
+        { 
+            var db=this.Context.CopyNew();
+            db.CurrentConnectionConfig.IsAutoCloseConnection = true;
+            db.Aop.OnExecutingChangeSql = (sql, pars) =>
+            {
+                sql= getChangeSqlFunc(this.Context.CurrentConnectionConfig.DbType, sql);
+                return new KeyValuePair<string, SugarParameter[]>(sql,pars);
+            };
+            var result= db.DbMaintenance.GetTableInfoList(false);
+            return result;
+        }
         public virtual List<DbTableInfo> GetTableInfoList(bool isCache = true)
         {
             string cacheKey = "DbMaintenanceProvider.GetTableInfoList"+this.Context.CurrentConnectionConfig.ConfigId;
@@ -50,6 +62,18 @@ namespace SqlSugar
             {
                 item.DbObjectType = DbObjectType.Table;
             }
+            return result;
+        }
+        public List<DbColumnInfo> GetColumnInfosByTableName(string tableName, Func<DbType, string, string> getChangeSqlFunc) 
+        {
+            var db = this.Context.CopyNew();
+            db.CurrentConnectionConfig.IsAutoCloseConnection = true;
+            db.Aop.OnExecutingChangeSql = (sql, pars) =>
+            {
+                sql = getChangeSqlFunc(this.Context.CurrentConnectionConfig.DbType, sql);
+                return new KeyValuePair<string, SugarParameter[]>(sql, pars);
+            };
+            var result = db.DbMaintenance.GetColumnInfosByTableName(tableName,false);
             return result;
         }
         public virtual List<DbColumnInfo> GetColumnInfosByTableName(string tableName, bool isCache = true)
@@ -174,6 +198,16 @@ namespace SqlSugar
         #endregion
 
         #region DDL
+        public virtual bool  SetAutoIncrementInitialValue(string tableName,int initialValue) 
+        {
+            Console.WriteLine("no support");
+            return true;
+        }
+        public virtual bool SetAutoIncrementInitialValue(Type entityType, int initialValue)
+        {
+            Console.WriteLine("no support");
+            return true;
+        }
         public  virtual bool DropIndex(string indexName)
         {
             indexName = this.SqlBuilder.GetNoTranslationColumnName(indexName);
@@ -229,7 +263,16 @@ namespace SqlSugar
         {
             tableName = this.SqlBuilder.GetTranslationTableName(tableName);
             columnName = this.SqlBuilder.GetTranslationTableName(columnName);
-            string sql = string.Format(this.AddPrimaryKeySql, tableName, string.Format("PK_{0}_{1}", this.SqlBuilder.GetNoTranslationColumnName(tableName), this.SqlBuilder.GetNoTranslationColumnName(columnName)), columnName);
+            var temp = "PK_{0}_{1}";
+            if (tableName.IsContainsIn(" ", "-")) 
+            {
+                temp = SqlBuilder.GetTranslationColumnName(temp);
+            }
+            string sql = string.Format(this.AddPrimaryKeySql, tableName, string.Format(temp, this.SqlBuilder.GetNoTranslationColumnName(tableName).Replace("-","_"), this.SqlBuilder.GetNoTranslationColumnName(columnName)), columnName);
+            if ((tableName+columnName).Length>25 &&this.Context?.CurrentConnectionConfig?.MoreSettings?.MaxParameterNameLength > 0) 
+            {
+                sql = string.Format(this.AddPrimaryKeySql, tableName, string.Format(temp, this.SqlBuilder.GetNoTranslationColumnName(tableName).GetNonNegativeHashCodeString(), "Id"), columnName);
+            }
             this.Context.Ado.ExecuteCommand(sql);
             return true;
         }
@@ -239,6 +282,10 @@ namespace SqlSugar
             tableName = this.SqlBuilder.GetTranslationTableName(tableName);
             var columnName = string.Join(",", columnNames);
             var pkName = string.Format("PK_{0}_{1}", this.SqlBuilder.GetNoTranslationColumnName(tableName), columnName.Replace(",","_"));
+            if (pkName.Length > 25 && this.Context?.CurrentConnectionConfig?.MoreSettings?.MaxParameterNameLength > 0)
+            {
+                pkName = "PK_" + pkName.GetNonNegativeHashCodeString();
+            }
             string sql = string.Format(this.AddPrimaryKeySql, tableName,pkName, columnName);
             this.Context.Ado.ExecuteCommand(sql);
             return true;
@@ -665,6 +712,10 @@ namespace SqlSugar
         #endregion
 
         #region Private
+        public virtual List<DbTableInfo> GetSchemaTables(EntityInfo entityInfo) 
+        {
+            return null;
+        }
         protected List<T> GetListOrCache<T>(string cacheKey, string sql)
         {
             return this.Context.Utilities.GetReflectionInoCacheInstance().GetOrCreate(cacheKey,

@@ -138,7 +138,18 @@ namespace SqlSugar
                     }
                     primaryKeyValues.Add(value);
                 }
-                if (primaryKeyValues.Count < 10000)
+                if (this.Context.CurrentConnectionConfig.DbType==DbType.Oracle &&primaryKeyValues.Count >= 1000) 
+                {
+                    List<string> inItems = new List<string>();
+                    this.Context.Utilities.PageEach(primaryKeyValues, 999, pageItems =>
+                    {
+                        var inValueString = pageItems.ToArray().ToJoinSqlInVals();
+                        var whereItem= string.Format(DeleteBuilder.WhereInTemplate, SqlBuilder.GetTranslationColumnName(primaryFields.Single()), inValueString);
+                        inItems.Add(whereItem);
+                    });
+                    Where($"({string.Join(" OR ", inItems)})");
+                }
+                else if (primaryKeyValues.Count < 10000)
                 {
                     var inValueString = primaryKeyValues.ToArray().ToJoinSqlInVals();
                     Where(string.Format(DeleteBuilder.WhereInTemplate, SqlBuilder.GetTranslationColumnName(primaryFields.Single()), inValueString));
@@ -221,6 +232,10 @@ namespace SqlSugar
                             if ((columnInfo.SqlParameterDbType.ObjToString() == System.Data.DbType.AnsiString.ObjToString()) || !(entityValue is string) || this.Context.CurrentConnectionConfig?.MoreSettings?.DisableNvarchar == true)
                             {
                                 tempequals = tempequals.Replace("=N'", "='");
+                            }
+                            else 
+                            {
+                                tempequals = SqlBuilder.RemoveN(tempequals);
                             }
                             entityValue = UtilMethods.GetConvertValue(entityValue);
                             andString.AppendFormat(tempequals, primaryField, entityValue);
@@ -401,6 +416,18 @@ namespace SqlSugar
             }
             return this;
         }
+        public IDeleteable<T> EnableQueryFilter(Type type)
+        {
+            var queryable = this.Context.Queryable<T>().Filter(type);
+            queryable.QueryBuilder.LambdaExpressions.ParameterIndex = 1000;
+            var sqlable = queryable.ToSql();
+            var whereInfos = Regex.Split(sqlable.Key, " Where ", RegexOptions.IgnoreCase);
+            if (whereInfos.Length > 1)
+            {
+                this.Where(whereInfos.Last(), sqlable.Value);
+            }
+            return this;
+        }
         public SplitTableDeleteProvider<T> SplitTable(Func<List<SplitTableInfo>, IEnumerable<SplitTableInfo>> getTableNamesFunc) 
         {
             UtilMethods.StartCustomSplitTable(this.Context, typeof(T));
@@ -531,7 +558,7 @@ namespace SqlSugar
             var lamResult = DeleteBuilder.GetExpressionValue(inField, ResolveExpressType.FieldSingle);
             var fieldName = lamResult.GetResultString();
             var sql= childQueryExpression.ToSql();
-            Where($" {fieldName} IN ( SELECT * FROM ( {sql.Key} ) SUBDEL) ",sql.Value);
+            Where($" {fieldName} IN ( SELECT {fieldName} FROM ( {sql.Key} ) SUBDEL) ",sql.Value);
             return this;
         }
         public IDeleteable<T> In<PkType>(string inField, List<PkType> primaryKeyValues)

@@ -18,7 +18,7 @@ namespace SqlSugar
         public bool IsAutoToUpper { get; set; } = true;
         public int DefaultCacheDurationInSeconds { get; set; }
         public bool? TableEnumIsString { get; set; }
-        public DateTime? DbMinDate { get; set; } = Convert.ToDateTime("1900-01-01");
+        public DateTime? DbMinDate { get; set; } = DateTime.MinValue.Date.AddYears(1900 - 1);
         public bool IsNoReadXmlDescription { get;  set; }
         public bool SqlServerCodeFirstNvarchar { get;  set; }
         public bool SqliteCodeFirstEnableDefaultValue { get; set; }
@@ -28,6 +28,10 @@ namespace SqlSugar
         public bool EnableModelFuncMappingColumn { get; set; }
         public bool EnableOracleIdentity { get; set; }
         public bool EnableCodeFirstUpdatePrecision { get;  set; }
+        public bool SqliteCodeFirstEnableDropColumn { get; set; }
         public bool IsCorrectErrorSqlParameterName { get; set; }
+        public int MaxParameterNameLength { get; set; }
+        public bool DisableQueryWhereColumnRemoveTrim { get; set; }
+        public DbType? DatabaseModel { get;set; }
     }
 }

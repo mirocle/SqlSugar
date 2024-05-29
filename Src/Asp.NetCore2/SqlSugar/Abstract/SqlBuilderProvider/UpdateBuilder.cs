@@ -40,6 +40,7 @@ namespace SqlSugar
         public  string ShortName { get; set; }
         public Dictionary<string, ReSetValueBySqlExpListModel> ReSetValueBySqlExpList { get;  set; }
         public virtual string ReSetValueBySqlExpListType { get; set; }
+        public EntityInfo EntityInfo { get; set; }
         public virtual string SqlTemplate
         {
             get
@@ -267,7 +268,7 @@ namespace SqlSugar
                     else if (JoinInfos!=null&&JoinInfos.Any()) 
                     {
                         setValue = SetValues.Where(sv => it.IsPrimarykey == false && (it.IsIdentity == false || (IsOffIdentity && it.IsIdentity))).Where(sv => sv.Key == Builder.GetNoTranslationColumnName(it.DbColumnName) || sv.Key == Builder.GetNoTranslationColumnName(it.PropertyName));
-                        return Builder.GetTranslationColumnName(this.ShortName)+"."+ setValue.First().Key+"="+ setValue.First().Value ;
+                        return Builder.GetTranslationColumnName(this.ShortName)+"."+ Builder.GetTranslationColumnName(setValue.First().Key)+"="+ setValue.First().Value ;
                     }
                 }
                 var result = Builder.GetTranslationColumnName(it.DbColumnName) + "=" + GetDbColumn(it,this.Context.Ado.SqlParameterKeyWord + it.DbColumnName);
@@ -287,11 +288,25 @@ namespace SqlSugar
             {
                 if (IsWhereColumns == false)
                 {
+                    int i = 100000;
                     foreach (var item in PrimaryKeys)
                     {
+                        i++;
                         var isFirst = whereString == null;
                         whereString += (isFirst ? " WHERE " : " AND ");
-                        whereString += Builder.GetTranslationColumnName(item) + "=" + this.Context.Ado.SqlParameterKeyWord + item;
+                        var pkIsSugarDataConverter = GetPkIsSugarDataConverter();
+                        if (pkIsSugarDataConverter && GetColumnInfo(item)!=null)
+                        {
+                            var columnInfo = GetColumnInfo(item);
+                            var value=this.DbColumnInfoList.FirstOrDefault(it => it.DbColumnName.EqualCase(item) || it.PropertyName.EqualCase(item))?.Value;
+                            var p = UtilMethods.GetParameterConverter(i, this.Context, value, this.EntityInfo, this.EntityInfo?.Columns.First(it => it.DbColumnName.Equals(item) || it.PropertyName.Equals(item)));
+                            whereString += Builder.GetTranslationColumnName(item) + "=" + p.ParameterName;
+                            this.Parameters.Add(p);
+                        }
+                        else
+                        {
+                            whereString += Builder.GetTranslationColumnName(item) + "=" + this.Context.Ado.SqlParameterKeyWord + item;
+                        }
                     }
                 }
             }
@@ -309,6 +324,17 @@ namespace SqlSugar
                 return GetJoinUpdate(columnsString, ref whereString);
             }
             return string.Format(SqlTemplate, GetTableNameString, columnsString, whereString);
+        }
+
+        private EntityColumnInfo GetColumnInfo(string item)
+        {
+            var columnInfo= this.EntityInfo?.Columns?.FirstOrDefault(it => it.DbColumnName.Equals(item) || it.PropertyName.Equals(item));
+            return columnInfo;
+        }
+
+        private bool GetPkIsSugarDataConverter()
+        {
+            return this.EntityInfo?.Columns.Any(it => it.IsPrimarykey && it.SqlParameterDbType is Type&&typeof(ISugarDataConverter).IsAssignableFrom((it.SqlParameterDbType as Type))) == true;
         }
 
         protected virtual string GetJoinUpdate(string columnsString, ref string whereString)
@@ -426,11 +452,28 @@ namespace SqlSugar
             {
                 return LambdaExpressions.DbMehtods.GetDate();
             }
-            else if (IsListSetExp(columnInfo)|| IsSingleSetExp(columnInfo))
+            else if (columnInfo.PropertyType.FullName == "NetTopologySuite.Geometries.Geometry") 
+            {
+                var pname = Builder.SqlParameterKeyWord + "Geometry" + GetDbColumnIndex;
+                var p = new SugarParameter(pname, columnInfo.Value);
+                p.DbType= System.Data.DbType.Object;
+                this.Parameters.Add(p);
+                GetDbColumnIndex++;
+                return pname;
+            }
+            else if (UtilMethods.IsErrorDecimalString() == true)
+            {
+                var pname = Builder.SqlParameterKeyWord + "Decimal" + GetDbColumnIndex;
+                var p = new SugarParameter(pname, columnInfo.Value);
+                this.Parameters.Add(p);
+                GetDbColumnIndex++;
+                return pname;
+            }
+            else if (IsListSetExp(columnInfo) || IsSingleSetExp(columnInfo))
             {
                 if (this.ReSetValueBySqlExpList[columnInfo.PropertyName].Type == ReSetValueBySqlExpListModelType.List)
                 {
-                    return Builder.GetTranslationColumnName(columnInfo.DbColumnName)+this.ReSetValueBySqlExpList[columnInfo.PropertyName].Sql+name;
+                    return Builder.GetTranslationColumnName(columnInfo.DbColumnName) + this.ReSetValueBySqlExpList[columnInfo.PropertyName].Sql + name;
                 }
                 else
                 {
@@ -439,6 +482,17 @@ namespace SqlSugar
             }
             else if (columnInfo.UpdateSql.HasValue())
             {
+                if (columnInfo.UpdateSql.Contains("{0}"))
+                {
+                    if (columnInfo.Value == null)
+                    {
+                        return string.Format(columnInfo.UpdateSql, "null").Replace("'null'", "null");
+                    }
+                    else
+                    {
+                        return string.Format(columnInfo.UpdateSql, columnInfo.Value?.ObjToString().ToSqlFilter());
+                    }
+                }
                 return columnInfo.UpdateSql;
             }
             else if (columnInfo.SqlParameterDbType is Type && (Type)columnInfo.SqlParameterDbType == UtilConstants.SqlConvertType)

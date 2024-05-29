@@ -18,19 +18,139 @@ namespace SqlSugar
 {
     public class UtilMethods
     {
+        internal static string GetTableByDbLink(SqlSugarProvider context,string tableName, string oldTableName, TenantAttribute attr)
+        {
+            QueryBuilder queryBuilder=InstanceFactory.GetQueryBuilderWithContext(context);
+            var dbLinkName = context.Root.GetConnection(attr.configId).CurrentConnectionConfig.DbLinkName;
+            if (dbLinkName != null)
+            {
+                if (dbLinkName.First() == '@')
+                {
+                    tableName = queryBuilder.Builder.GetTranslationColumnName(oldTableName) + dbLinkName;
+                }
+                else if (dbLinkName.Last() == '_')
+                {
+                    tableName = dbLinkName + oldTableName;
+                }
+                else
+                {
+                    tableName = dbLinkName + "." + queryBuilder.Builder.GetTranslationColumnName(oldTableName);
+                }
+            } 
+            return tableName;
+        }
+        public static List<Tuple<string, Type>> GetColumnInfo(IDataReader reader)
+        {
+            var columnInfo = new List<Tuple<string, Type>>();
 
+            // 获取列的数量  
+            int columnCount = reader.FieldCount;
+
+            // 遍历每一列  
+            for (int i = 0; i < columnCount; i++)
+            {
+                // 获取列名  
+                string columnName = reader.GetName(i);
+
+                // 获取列的数据类型  
+                Type columnType = reader.GetFieldType(i);
+
+                // 将列名和类型添加到列表中  
+                columnInfo.Add(Tuple.Create(columnName, columnType));
+            }
+
+            return columnInfo;
+        }
+        public static object ConvertToObjectList(Type targetType, List<object> sourceList)
+        {
+            // 创建 List<Type> 类型的实例
+            object resultList = Activator.CreateInstance(typeof(List<>).MakeGenericType(targetType));
+            // 获取 Add 方法
+            var addMethod = resultList.GetType().GetMethod("Add");
+            foreach (var obj in sourceList)
+            {
+                addMethod.Invoke(resultList, new object[] { obj });
+            } 
+            return resultList;
+        }
+        public static Dictionary<string, object> DataRowToDictionary(DataRow row)
+        {
+            Dictionary<string, object> dictionary = new Dictionary<string, object>();
+
+            // 遍历所有列并将其添加到字典中
+            foreach (DataColumn column in row.Table.Columns)
+            {
+                if (column.ColumnName != "Items" && column.DataType.Name.IsCollectionsList() == false)
+                {
+                    dictionary.Add(column.ColumnName, row[column]);
+                }
+            }
+
+            return dictionary;
+        }
+        public static IEnumerable<T> BuildTree<T>(ISqlSugarClient db,IEnumerable<T> list, string idName, string pIdName, string childName, object rootValue)
+        {
+            var entityInfo = db.EntityMaintenance.GetEntityInfo<T>(); ;
+            var mainIdProp = entityInfo.Type.GetProperty(idName);
+            var pIdProp = entityInfo.Type.GetProperty(pIdName);
+            var childProp = entityInfo.Type.GetProperty(childName);
+
+            Dictionary<string, T> kvList;
+            IEnumerable<IGrouping<string, T>> group;
+            BuildTreeGroup(list, mainIdProp, pIdProp, out kvList, out group);
+
+            var root = rootValue != null ? group.FirstOrDefault(x => x.Key == rootValue.ObjToString()) : group.FirstOrDefault(x => x.Key == null || x.Key == "" || x.Key == "0" || x.Key == Guid.Empty.ToString());
+
+            if (root != null)
+            {
+                foreach (var item in group)
+                {
+                    if (kvList.TryGetValue(item.Key, out var parent))
+                    {
+                        childProp.SetValue(parent, item.ToList());
+                    }
+                }
+            }
+
+            return root;
+        }
+
+        private static void BuildTreeGroup<T>(IEnumerable<T> list, PropertyInfo mainIdProp, PropertyInfo pIdProp, out Dictionary<string, T> kvList, out IEnumerable<IGrouping<string, T>> group)
+        {
+            kvList = list.ToDictionary(x => mainIdProp.GetValue(x).ObjToString());
+            group = list.GroupBy(x => pIdProp.GetValue(x).ObjToString());
+        }
+
+        internal static bool? _IsErrorDecimalString { get; set; }
+        internal static bool? IsErrorDecimalString() 
+        {
+            if (_IsErrorDecimalString == null)
+            {
+                decimal dec = Convert.ToDecimal(1.1);
+                _IsErrorDecimalString = dec.ToString().Contains(",");
+            }
+            return _IsErrorDecimalString;
+        }
         internal static bool IsParameterConverter(EntityColumnInfo columnInfo)
         {
             return columnInfo != null && columnInfo.SqlParameterDbType != null && columnInfo.SqlParameterDbType is Type
                 && typeof(ISugarDataConverter).IsAssignableFrom(columnInfo.SqlParameterDbType as Type);
         }
-        internal static SugarParameter GetParameterConverter(ISqlSugarClient db,object value, Expression oppoSiteExpression, EntityColumnInfo columnInfo)
+        internal static SugarParameter GetParameterConverter(int index,ISqlSugarClient db,object value, Expression oppoSiteExpression, EntityColumnInfo columnInfo)
         {
             var entity = db.EntityMaintenance.GetEntityInfo(oppoSiteExpression.Type);
             var type = columnInfo.SqlParameterDbType as Type;
             var ParameterConverter = type.GetMethod("ParameterConverter").MakeGenericMethod(columnInfo.PropertyInfo.PropertyType);
             var obj = Activator.CreateInstance(type);
-            var p = ParameterConverter.Invoke(obj, new object[] { value, 100 }) as SugarParameter;
+            var p = ParameterConverter.Invoke(obj, new object[] { value, 100+index }) as SugarParameter;
+            return p;
+        }
+        internal static SugarParameter GetParameterConverter(int index, ISqlSugarClient db, object value,EntityInfo entity, EntityColumnInfo columnInfo)
+        { 
+            var type = columnInfo.SqlParameterDbType as Type;
+            var ParameterConverter = type.GetMethod("ParameterConverter").MakeGenericMethod(columnInfo.PropertyInfo.PropertyType);
+            var obj = Activator.CreateInstance(type);
+            var p = ParameterConverter.Invoke(obj, new object[] { value, 100 + index }) as SugarParameter;
             return p;
         }
         internal static bool IsErrorParameterName(ConnectionConfig connectionConfig,DbColumnInfo columnInfo)
@@ -269,6 +389,16 @@ namespace SqlSugar
             {
                 context.CurrentConnectionConfig.ConfigureExternalServices.SplitTableService
                     = (ISplitTableService)Activator.CreateInstance(splitTableAttribute.CustomSplitTableService);
+            }
+            if (
+                context?.CurrentConnectionConfig?.ConfigureExternalServices?.SplitTableService !=null
+                && splitTableAttribute.CustomSplitTableService == null
+                && context.EntityMaintenance.GetEntityInfo(entityType).DbTableName?.EndsWith("_{year}{month}{day}") ==true
+                && !context.EntityMaintenance.GetEntityInfo(entityType).DbTableName?.Replace("_{year}{month}{day}","")?.Contains("{") == true
+                )
+            {
+                context.CurrentConnectionConfig.ConfigureExternalServices.SplitTableService
+                      = null;
             }
         }
         public static void ConvertParameter(SugarParameter p, ISqlBuilder builder)
@@ -525,7 +655,11 @@ namespace SqlSugar
                     EnableCodeFirstUpdatePrecision=it.MoreSettings.EnableCodeFirstUpdatePrecision,
                     SqliteCodeFirstEnableDefaultValue=it.MoreSettings.SqliteCodeFirstEnableDefaultValue,
                     SqliteCodeFirstEnableDescription=it.MoreSettings.SqliteCodeFirstEnableDescription,
-                    IsCorrectErrorSqlParameterName = it.MoreSettings.IsCorrectErrorSqlParameterName
+                    IsCorrectErrorSqlParameterName = it.MoreSettings.IsCorrectErrorSqlParameterName,
+                    SqliteCodeFirstEnableDropColumn=it.MoreSettings.SqliteCodeFirstEnableDropColumn,
+                    MaxParameterNameLength=it.MoreSettings.MaxParameterNameLength,
+                    DisableQueryWhereColumnRemoveTrim=it.MoreSettings.DisableQueryWhereColumnRemoveTrim,
+                    DatabaseModel=it.MoreSettings.DatabaseModel
 
                 },
                 SqlMiddle = it.SqlMiddle == null ? null : new SqlMiddle
@@ -740,6 +874,10 @@ namespace SqlSugar
         }
         public static object ChangeType2(object value, Type type)
         {
+            if (value is byte[]&&type==UtilConstants.StringType) 
+            {
+                return Encoding.UTF8.GetString(value as byte[]);
+            }
             if (value == null && type.IsGenericType) return Activator.CreateInstance(type);
             if (value == null) return null;
             if (type == value.GetType()) return value;
@@ -789,6 +927,25 @@ namespace SqlSugar
                     //Compatible with.NET CORE parameters case
                     var name = parameter.ParameterName;
                     string newName = name + append + addIndex;
+                    appendSql = ReplaceSqlParameter(appendSql, parameter, newName);
+                    parameter.ParameterName = newName;
+                }
+            }
+        }
+        internal static void RepairReplicationParameters(ISqlSugarClient db,ref string appendSql, SugarParameter[] parameters, int addIndex, string append = null)
+        {
+            if (appendSql.HasValue() && parameters.HasValue())
+            {
+                foreach (var parameter in parameters.OrderByDescending(it => it.ParameterName.Length))
+                {
+                    //Compatible with.NET CORE parameters case
+                    var name = parameter.ParameterName;
+                    string newName = name + append + addIndex;
+                    var maxLength = db.CurrentConnectionConfig.MoreSettings.MaxParameterNameLength;
+                    if (newName.Length > maxLength) 
+                    { 
+                          newName =(name.Substring(0,1)+name.GetNonNegativeHashCodeString() + "_" + addIndex);
+                    }
                     appendSql = ReplaceSqlParameter(appendSql, parameter, newName);
                     parameter.ParameterName = newName;
                 }
@@ -1374,6 +1531,23 @@ namespace SqlSugar
                     {
                         result = result.Replace(item.ParameterName, item.Value.ObjToString());
                     }
+                    else if (item.Value is DateTime&&connectionConfig.DbType==DbType.SqlServer)
+                    {
+                        result = result.Replace(item.ParameterName, "CAST('" + item.Value.ObjToDate().ToString("yyyy-MM-dd HH:mm:ss.fff") + "' AS DATETIME)");
+                    }
+                    else if (item.Value is DateTime&& connectionConfig.DbType.IsIn(DbType.Dm,DbType.Oracle))
+                    {
+                        if (item.DbType == System.Data.DbType.Date|| connectionConfig?.MoreSettings?.DisableMillisecond == true)
+                        {
+                            var value = "to_date('" + item.Value.ObjToDate().ToString("yyyy-MM-dd HH:mm:ss") + "', 'YYYY-MM-DD HH24:MI:SS')  ";;
+                            result = result.Replace(item.ParameterName, value);
+                        } 
+                        else 
+                        {
+                            var value = "to_timestamp('" + item.Value.ObjToDate().ToString("yyyy-MM-dd HH:mm:ss.ffffff") + "', 'YYYY-MM-DD HH24:MI:SS.FF') ";
+                            result = result.Replace(item.ParameterName, value);
+                        }
+                    }
                     else if (item.Value is DateTime)
                     {
                         result = result.Replace(item.ParameterName, "'"+item.Value.ObjToDate().ToString("yyyy-MM-dd HH:mm:ss.fff")+"'");
@@ -1425,7 +1599,12 @@ namespace SqlSugar
             }
         }
 
+        [Obsolete("请使用新名字：FieldNameSql")]
         public static string FiledNameSql()
+        {
+            return $"[value=sql{UtilConstants.ReplaceKey}]";
+        }
+        public static string FieldNameSql()
         {
             return $"[value=sql{UtilConstants.ReplaceKey}]";
         }

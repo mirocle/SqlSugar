@@ -209,6 +209,12 @@ namespace SqlSugar
             this.QueryableObj = method.Invoke(QueryableObj, new object[] { navProperyName });
             return this;
         }
+        public QueryMethodInfo IgnoreColumns(params string [] ignoreColumns)
+        {
+            var method = QueryableObj.GetType().GetMyMethod("IgnoreColumns", 1, typeof(string[]));
+            this.QueryableObj = method.Invoke(QueryableObj, new object[] { ignoreColumns });
+            return this;
+        }
         public QueryMethodInfo Includes(string navProperyName,string thenNavProperyName2)
         {
             var method = QueryableObj.GetType().GetMyMethod("IncludesByNameString", 2, typeof(string),typeof(string));
@@ -245,6 +251,24 @@ namespace SqlSugar
             var reslt = method.Invoke(QueryableObj, new object[] { });
             return reslt;
         }
+        public string ToSqlString()
+        {
+            var method = QueryableObj.GetType().GetMyMethod("ToSqlString", 0);
+            var reslt = method.Invoke(QueryableObj, new object[] { });
+            return (string)reslt;
+        }
+        public KeyValuePair<string, List<SugarParameter>> ToSql()
+        {
+            var method = QueryableObj.GetType().GetMyMethod("ToSql", 0);
+            var reslt = method.Invoke(QueryableObj, new object[] { });
+            return (KeyValuePair<string, List<SugarParameter>>)reslt;
+        }
+        public object InSingle(object pkValue)
+        {
+            var method = QueryableObj.GetType().GetMyMethod("InSingle", 1);
+            var reslt = method.Invoke(QueryableObj, new object[] { pkValue });
+            return reslt;
+        }
         public bool CreateView(string viewNameFomat)
         {
             if (viewNameFomat?.Contains("{0}")!=true) 
@@ -277,6 +301,14 @@ namespace SqlSugar
             var reslt = method.Invoke(QueryableObj, new object[] { });
             return Convert.ToBoolean(reslt);
         }
+
+        public object ToTree(string childPropertyName, string parentIdPropertyName, object rootValue, string primaryKeyPropertyName)
+        {
+            var method = QueryableObj.GetType().GetMyMethod("ToTree", 4,typeof(string),typeof(string),typeof(object),typeof(string));
+            var reslt = method.Invoke(QueryableObj, new object[] {childPropertyName,parentIdPropertyName,rootValue,primaryKeyPropertyName });
+            return  reslt;
+        }
+
         #endregion
 
         #region Result Async
@@ -310,7 +342,20 @@ namespace SqlSugar
             var method = QueryableObj.GetType().GetMyMethod("AnyAsync", 0);
             var reslt = method.Invoke(QueryableObj, new object[] { });
             return await (Task<bool>) reslt;
-        } 
+        }
+        public async Task<object> InSingleAsync(object pkValue)
+        {
+            var method = QueryableObj.GetType().GetMyMethod("InSingleAsync", 1);
+            var task = (Task)method.Invoke(QueryableObj, new object[] { pkValue });
+            return await GetTask(task).ConfigureAwait(false);
+        }
+
+        public async Task<object> ToTreeAsync(string childPropertyName, string parentIdPropertyName, object rootValue, string primaryKeyPropertyName)
+        {
+            var method = QueryableObj.GetType().GetMyMethod("ToTreeAsync", 4, typeof(string), typeof(string), typeof(object), typeof(string));
+            var task =(Task)method.Invoke(QueryableObj, new object[] { childPropertyName, parentIdPropertyName, rootValue, primaryKeyPropertyName });
+            return await GetTask(task).ConfigureAwait(false);
+        }
         #endregion
 
         #region Helper

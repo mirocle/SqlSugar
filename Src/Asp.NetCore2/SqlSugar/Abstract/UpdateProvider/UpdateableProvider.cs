@@ -112,7 +112,11 @@ namespace SqlSugar
             {
                 return 0;
             }
-            var result = this.Ado.ExecuteCommand(sql, UpdateBuilder.Parameters == null ? null : UpdateBuilder.Parameters.ToArray());
+            var result = 0;
+            if (sql != Environment.NewLine)
+            {
+                result = this.Ado.ExecuteCommand(sql, UpdateBuilder.Parameters == null ? null : UpdateBuilder.Parameters.ToArray());
+            }
             After(sql);
             return result;
         }
@@ -190,9 +194,12 @@ namespace SqlSugar
             result.DataList = this.UpdateObjs;
             result.TableName = this.UpdateBuilder.TableName;
             result.IsEnableDiffLogEvent = this.IsEnableDiffLogEvent;
-            result.DiffModel = this.diffModel; 
+            result.WhereColumnList = this.WhereColumnList?.ToArray();
+            result.DiffModel = this.diffModel;
             if (this.UpdateBuilder.DbColumnInfoList.Any())
                 result.UpdateColumns = this.UpdateBuilder.DbColumnInfoList.GroupBy(it => it.TableId).First().Select(it => it.DbColumnName).ToList();
+            if(this.UpdateBuilder?.UpdateColumns?.Any()==true)
+                result.UpdateColumns = this.UpdateBuilder.UpdateColumns;
             return result;
         }
         public IUpdateable<T, T2> InnerJoin<T2>(Expression<Func<T, T2, bool>> joinExpress) 
@@ -283,6 +290,10 @@ namespace SqlSugar
             SplitTableUpdateByObjectProvider<T> result = new SplitTableUpdateByObjectProvider<T>();
             result.Context = this.Context;
             result.UpdateObjects = this.UpdateObjs;
+            result.IsEnableDiffLogEvent = this.IsEnableDiffLogEvent;
+            result.BusinessData = this.diffModel?.BusinessData;
+            if(this.IsWhereColumns)
+              result.WhereColumns = this.WhereColumnList;
             SplitTableContext helper = new SplitTableContext(Context)
             {
                 EntityInfo = this.EntityInfo
@@ -530,6 +541,8 @@ namespace SqlSugar
 
         public IUpdateable<T> WhereColumns(string[] columnNames)
         {
+            if (columnNames == null) return this;
+
             ThrowUpdateByExpression();
             if (this.WhereColumnList == null) this.WhereColumnList = new List<string>();
             foreach (var columnName in columnNames)
@@ -698,17 +711,24 @@ namespace SqlSugar
                 return SetColumns(filedNameExpression,(object)null);
             }
             var name = UpdateBuilder.GetExpressionValue(filedNameExpression, ResolveExpressType.FieldSingle).GetString();
-            name = UpdateBuilder.Builder.GetNoTranslationColumnName(name);
-            var value = UpdateBuilder.GetExpressionValue(valueExpression, ResolveExpressType.FieldSingle).GetString();
-            this.UpdateBuilder.DbColumnInfoList.Add(new DbColumnInfo()
+            name = UpdateBuilder.Builder.GetTranslationColumnName(name);
+            var exp = ExpressionTool.RemoveConvert((valueExpression as LambdaExpression).Body);
+            var value = UpdateBuilder.GetExpressionValue(exp, ResolveExpressType.WhereSingle).GetString();
+            value = $" {name}={value} ";
+            this.UpdateBuilder.SetValues.Add(new KeyValuePair<string, string>(name,value)); 
+            this.UpdateBuilder.DbColumnInfoList = this.UpdateBuilder.DbColumnInfoList.Where(it => (UpdateParameterIsNull == false && IsPrimaryKey(it)) || UpdateBuilder.SetValues.Any(v => SqlBuilder.GetNoTranslationColumnName(v.Key).Equals(it.DbColumnName, StringComparison.CurrentCultureIgnoreCase) || SqlBuilder.GetNoTranslationColumnName(v.Key).Equals(it.PropertyName, StringComparison.CurrentCultureIgnoreCase)) || it.IsPrimarykey == true).ToList();
+            AppendSets();
+            if (typeof(T) == UtilConstants.ObjType)
             {
-                DbColumnName = name,
-                Value = value,
-                PropertyName = name ,
-                SqlParameterDbType=typeof(SqlSugar.DbConvert.NoParameterCommonPropertyConvert)
-            });
-            this.UpdateBuilder.SetValues.Add(new KeyValuePair<string, string>(name,value));
-            return this;
+                this.UpdateBuilder.DbColumnInfoList.Add(new DbColumnInfo()
+                {
+                    DbColumnName = UpdateBuilder.Builder.GetNoTranslationColumnName(name),
+                    Value = value,
+                    PropertyName = name,
+                    SqlParameterDbType = typeof(SqlSugar.DbConvert.NoParameterCommonPropertyConvert)
+                });
+            }
+            return this; 
         }
         public IUpdateable<T> SetColumns(Expression<Func<T, object>> filedNameExpression, object fieldValue) 
         {
@@ -731,10 +751,7 @@ namespace SqlSugar
                     string key = key = keys[i].Key;
                     i++;
                     var value = item;
-                    if (value.Contains("= \"SYSDATE\""))
-                    {
-                        value = value.Replace("= \"SYSDATE\"", "= SYSDATE");
-                    }
+                    value = GetSetSql(value, columns);
                     UpdateBuilder.SetValues.Add(new KeyValuePair<string, string>(SqlBuilder.GetTranslationColumnName(key), value));
                 }
             }
@@ -812,6 +829,15 @@ namespace SqlSugar
             Check.Exception(!binaryExp.NodeType.IsIn(ExpressionType.Equal), "No support {0}", columns.ToString());
             Check.Exception(!(binaryExp.Left is MemberExpression) && !(binaryExp.Left is UnaryExpression), "No support {0}", columns.ToString());
             Check.Exception(ExpressionTool.IsConstExpression(binaryExp.Left as MemberExpression), "No support {0}", columns.ToString());
+            if (UpdateBuilder.LambdaExpressions.ParameterIndex <= 1&&
+                                        this.EntityInfo.Columns
+                                       .Select(it=>it.PropertyName.TrimEnd('2'))
+                                       .GroupBy(it=>it)
+                                       .Any(it=>it.Count()>1) 
+                                   ) 
+            {
+                UpdateBuilder.LambdaExpressions.ParameterIndex = 100;
+            }
             var expResult = UpdateBuilder.GetExpressionValue(columns, ResolveExpressType.WhereSingle).GetResultString().Replace(")", " )").Replace("(", "( ").Trim().TrimStart('(').TrimEnd(')').Replace("= =","=");
             if (expResult.EndsWith(" IS NULL  ")) 
             {
@@ -830,7 +856,7 @@ namespace SqlSugar
 
             if (columns.ToString().Contains("Subqueryable()."))
             {
-                expResult= expResult.Replace(this.SqlBuilder.GetTranslationColumnName((binaryExp.Left as MemberExpression).Expression+"") +".",this.UpdateBuilder.GetTableNameString.TrimEnd()+".");
+                expResult= expResult.Replace(this.SqlBuilder.GetTranslationColumnName((ExpressionTool.RemoveConvert(binaryExp.Left) as MemberExpression).Expression+"") +".",this.UpdateBuilder.GetTableNameString.TrimEnd()+".");
             }
 
             UpdateBuilder.SetValues.Add(new KeyValuePair<string, string>(SqlBuilder.GetTranslationColumnName(key), expResult));
@@ -850,6 +876,22 @@ namespace SqlSugar
             ThrowUpdateByObject();
             if (isUpdateColumns)
                 SetColumns(columns);
+            return this;
+        }
+        public IUpdateable<T> In<PkType>(Expression<Func<T, object>> inField, ISugarQueryable<PkType> childQueryExpression)
+        {
+            var lamResult = UpdateBuilder.GetExpressionValue(inField, ResolveExpressType.FieldSingle);
+            this.UpdateBuilder.LambdaExpressions.ParameterIndex = childQueryExpression.QueryBuilder.LambdaExpressions.ParameterIndex+1;
+            var fieldName = lamResult.GetResultString();
+            if (!this.UpdateBuilder.SetValues.Any())
+            {
+                var sql = childQueryExpression.ToSql();
+                Where($" {fieldName} IN ( SELECT {fieldName} FROM ( {sql.Key} ) SUBDEL) ", sql.Value);
+            }
+            else
+            {
+                Where($" {fieldName} IN ( SELECT {fieldName} FROM ( {childQueryExpression.ToSqlString()} ) SUBDEL) ");
+            }
             return this;
         }
         public IUpdateable<T> WhereIF(bool isWhere, Expression<Func<T, bool>> expression) 

@@ -17,6 +17,12 @@ namespace SqlSugar
     }
     public class MySqlMethod : DefaultDbMethod, IDbMethods
     {
+        public override string JsonArrayLength(MethodCallExpressionModel model)
+        {
+            var parameter = model.Args[0];
+            return $" JSON_LENGTH({parameter.MemberName}) ";
+        }
+
         public override string JsonIndex(MethodCallExpressionModel model)
         {
             var parameter = model.Args[0];
@@ -45,11 +51,25 @@ namespace SqlSugar
             var parameter2 = model.Args[1];
             if (parameter.MemberName != null && parameter.MemberName is DateTime)
             {
-                return string.Format(" {0}('{1}') ", parameter2.MemberValue, parameter.MemberName);
+                if (parameter2.MemberValue?.ToString() == DateType.Weekday.ToString())
+                {
+                    return string.Format(" case when {0}('{1}')=6 then 0 else  ({0}('{1}')+1) end ", parameter2.MemberValue, parameter.MemberName);
+                }
+                else
+                {
+                    return string.Format(" {0}('{1}') ", parameter2.MemberValue, parameter.MemberName);
+                }
             }
             else
             {
-                return string.Format(" {0}({1}) ", parameter2.MemberValue, parameter.MemberName);
+                if (parameter2.MemberValue?.ToString() == DateType.Weekday.ToString())
+                {
+                    return string.Format(" case when {0}({1})=6 then 0 else  ({0}({1})+1) end ", parameter2.MemberValue, parameter.MemberName);
+                }
+                else
+                {
+                    return string.Format(" {0}({1}) ", parameter2.MemberValue, parameter.MemberName);
+                }
             }
         }
 
@@ -89,6 +109,30 @@ namespace SqlSugar
             if (parameter3.MemberValue.ObjToString() == DateType.Weekday.ObjToString()) 
             {
                 parameter3.MemberValue = "Week";
+            }
+            if (parameter3.MemberValue.ObjToString() == DateType.Month.ObjToString())
+            {
+                return string.Format(" (DATE_FORMAT({0}, '%Y%m') = DATE_FORMAT({1}, '%Y%m')) ", parameter.MemberName, parameter2.MemberName, parameter3.MemberValue);
+            }
+            else if (parameter3.MemberValue.ObjToString() == DateType.Year.ObjToString())
+            {
+                return string.Format(" (DATE_FORMAT({0}, '%Y') = DATE_FORMAT({1}, '%Y')) ", parameter.MemberName, parameter2.MemberName, parameter3.MemberValue);
+            }
+            else if (parameter3.MemberValue.ObjToString() == DateType.Day.ObjToString())
+            {
+                return string.Format(" (DATE_FORMAT({0},  '%Y-%m-%d') = DATE_FORMAT({1},  '%Y-%m-%d')) ", parameter.MemberName, parameter2.MemberName, parameter3.MemberValue);
+            }
+            else if (parameter3.MemberValue.ObjToString() == DateType.Hour.ObjToString())
+            {
+                return string.Format(" (DATE_FORMAT({0},  '%Y-%m-%d %H') = DATE_FORMAT({1},  '%Y-%m-%d %H')) ", parameter.MemberName, parameter2.MemberName, parameter3.MemberValue);
+            }
+            else if (parameter3.MemberValue.ObjToString() == DateType.Minute.ObjToString())
+            {
+                return string.Format(" (DATE_FORMAT({0},  '%Y-%m-%d %H:%i') = DATE_FORMAT({1},  '%Y-%m-%d %H:%i')) ", parameter.MemberName, parameter2.MemberName, parameter3.MemberValue);
+            }
+            else if (parameter3.MemberValue.ObjToString() == DateType.Second.ObjToString())
+            {
+                return string.Format(" (DATE_FORMAT({0},  '%Y-%m-%d %H:%i:%S') = DATE_FORMAT({1},  '%Y-%m-%d %H:%i:%S')) ", parameter.MemberName, parameter2.MemberName, parameter3.MemberValue);
             }
             return string.Format(" (TIMESTAMPDIFF({2},{0},{1})=0) ", parameter.MemberName, parameter2.MemberName, parameter3.MemberValue);
         }

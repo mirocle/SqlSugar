@@ -115,7 +115,7 @@ namespace SqlSugar
         public virtual string ContainsArray(MethodCallExpressionModel model)
         {
             var inValueIEnumerable = (IEnumerable)model.Args[0].MemberValue;
-            List<object> inValues = new List<object>();
+            List<object> inValues = new List<object>(); 
             if (inValueIEnumerable != null)
             {
                 foreach (var item in inValueIEnumerable)
@@ -145,9 +145,13 @@ namespace SqlSugar
             var isNvarchar = model.Args.Count == 3;
             if (inValues != null && inValues.Count > 0)
             {
-                if (isNvarchar&& model.Args[2].MemberValue.Equals(true))
+                if (isNvarchar && model.Args[2].MemberValue.Equals(true))
                 {
                     inValueString = inValues.ToArray().ToJoinSqlInValsN();
+                }
+                else if (inValues.Any()&&inValues.FirstOrDefault() is bool &&inValues.All(it => it is bool)) 
+                {
+                    inValueString = string.Join(",", inValues.Select(it => Convert.ToBoolean(it) ? 1 : 0));
                 }
                 else
                 {
@@ -607,8 +611,16 @@ namespace SqlSugar
         {
 
             var str = "concat('" + model.Args[0].MemberValue.ObjToString() + "')";
+            if (model.Args.Count == 2 && model.Args[1].MemberValue is string[])
+            {
+                List<MethodCallExpressionArgs> args = GetStringFormatArgs(str, model.Args[1].MemberValue as string[]);
+                return Format(new MethodCallExpressionModel()
+                {
+                    Args = args
+                }); ;
+            }
             str = Regex.Replace(str, @"(\{\d+?\})", "',$1,'");
-            var array = model.Args.Skip(1).Select(it => it.IsMember ? it.MemberName : it.MemberValue)
+            var array = model.Args.Skip(1).Select(it => it.IsMember ? it.MemberName : (it.MemberValue == null ? "''" : it.MemberValue.ToSqlValue()))
                 .Select(it => ToString(new MethodCallExpressionModel()
                 {
                     Args = new List<MethodCallExpressionArgs>() {
@@ -1022,7 +1034,7 @@ namespace SqlSugar
                         var newValue = "null";
                         if (value != null)
                         {
-                            if (UtilMethods.IsNumber(columnInfo.UnderType.Name))
+                            if (columnInfo.DbTableName!= "String" && UtilMethods.IsNumber(columnInfo.UnderType.Name))
                             {
                                 newValue = value.ToString();
                             }

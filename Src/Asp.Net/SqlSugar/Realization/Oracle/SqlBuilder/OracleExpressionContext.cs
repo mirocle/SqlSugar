@@ -105,7 +105,14 @@ namespace SqlSugar
         }
         public override string GetStringJoinSelector(string result, string separator)
         {
-            return $"listagg(to_char({result}),'{separator}') within group(order by {result}) ";
+            if (result.Contains(","))
+            {
+                return $"listagg(to_char({result.Split(',').First()}),'{separator}') within group(order by {result.Split(',').Last()}) ";
+            }
+            else
+            {
+                return $"listagg(to_char({result}),'{separator}') within group(order by {result}) ";
+            }
         }
         public override string HasValue(MethodCallExpressionModel model)
         {
@@ -212,8 +219,10 @@ namespace SqlSugar
                     return string.Format("(CAST(TO_CHAR({0},'mi') AS NUMBER))", parameter.MemberName);
                 case DateType.Millisecond:
                     return string.Format("(CAST(TO_CHAR({0},'ff3') AS NUMBER))", parameter.MemberName);
+                case DateType.Quarter:
+                    return string.Format("(CAST(TO_CHAR({0},'q') AS NUMBER))", parameter.MemberName);
                 case DateType.Weekday:
-                    return $" to_char({parameter.MemberName},'day') ";
+                    return $" (TO_NUMBER(TO_CHAR({parameter.MemberName}, 'D'))-1) ";
                 case DateType.Day:
                 default:
                     return string.Format("(CAST(TO_CHAR({0},'dd') AS NUMBER))", parameter.MemberName);

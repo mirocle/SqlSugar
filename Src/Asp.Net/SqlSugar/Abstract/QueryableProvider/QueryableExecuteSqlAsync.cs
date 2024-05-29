@@ -131,7 +131,7 @@ namespace SqlSugar
 
         public async Task<bool> AnyAsync()
         {
-            return await this.CountAsync() > 0;
+            return  (await this.Take(1).Select("1").ToListAsync()).Count() > 0; ;
         }
 
         public Task<int> CountAsync(CancellationToken token) 
@@ -390,6 +390,22 @@ namespace SqlSugar
             var list =await this.ToPageListAsync(pageNumber, pageSize, totalNumber);
             return this.Context.Utilities.ListToDataTable(list);
         }
+        public Task<List<T>> ToOffsetPageAsync(int pageNumber, int pageSize, RefAsync<int> totalNumber, CancellationToken token)
+        {
+            this.Context.Ado.CancellationToken = token;
+            return ToOffsetPageAsync(pageNumber, pageSize, totalNumber);
+        }
+        public Task<List<T>> ToOffsetPageAsync(int pageNumber, int pageSize, RefAsync<int> totalNumber, RefAsync<int> totalPage, CancellationToken token) 
+        {
+            this.Context.Ado.CancellationToken = token;
+            return ToOffsetPageAsync(pageNumber, pageSize, totalNumber, totalPage);
+        }
+        public async Task<List<T>> ToOffsetPageAsync(int pageNumber, int pageSize, RefAsync<int> totalNumber, RefAsync<int> totalPage)
+        {
+            var result = await ToOffsetPageAsync(pageNumber, pageSize, totalNumber);
+            totalPage.Value = (totalNumber.Value + pageSize - 1) / pageSize;
+            return result;
+        }
         public async Task<List<T>> ToOffsetPageAsync(int pageIndex, int pageSize, RefAsync<int> totalNumber)
         {
             if (this.Context.CurrentConnectionConfig.DbType != DbType.SqlServer)
@@ -579,6 +595,15 @@ ParameterT parameter)
                 var result = list.ToDictionary(it => it.Key.ObjToString(), it => it.Value);
                 return result;
             }
+        }
+        public async Task<List<T>> ToTreeAsync(string childPropertyName, string parentIdPropertyName, object rootValue, string primaryKeyPropertyName)
+        {
+            var entity = this.Context.EntityMaintenance.GetEntityInfo<T>();
+            var pk = primaryKeyPropertyName;
+            var list =await this.ToListAsync();
+            Expression<Func<T, IEnumerable<object>>> childListExpression = (Expression<Func<T, IEnumerable<object>>>)ExpressionBuilderHelper.CreateExpressionSelectField(typeof(T), childPropertyName, typeof(IEnumerable<object>));
+            Expression<Func<T, object>> parentIdExpression = (Expression<Func<T, object>>)ExpressionBuilderHelper.CreateExpressionSelectFieldObject(typeof(T), parentIdPropertyName);
+            return  GetTreeRoot(childListExpression, parentIdExpression, pk, list, rootValue) ?? new List<T>();
         }
         public async Task<List<T>> ToTreeAsync(Expression<Func<T, IEnumerable<object>>> childListExpression, Expression<Func<T, object>> parentIdExpression, object rootValue, object[] childIds)
         {

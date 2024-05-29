@@ -283,6 +283,16 @@ namespace SqlSugar
         #endregion
 
         #region Methods
+        public override bool SetAutoIncrementInitialValue(string tableName, int initialValue)
+        {
+            initialValue++;
+            this.Context.Ado.ExecuteCommand($"ALTER TABLE " + this.SqlBuilder.GetTranslationColumnName(tableName) + " AUTO_INCREMENT = " + initialValue);
+            return true;
+        }
+        public override bool SetAutoIncrementInitialValue(Type entityType, int initialValue)
+        {
+            return this.SetAutoIncrementInitialValue(this.Context.EntityMaintenance.GetEntityInfo(entityType).DbTableName, initialValue);
+        }
         public override List<string> GetDbTypes()
         {
             return this.Context.Ado.SqlQuery<string>(@"SELECT DISTINCT DATA_TYPE
@@ -372,7 +382,7 @@ WHERE EVENT_OBJECT_TABLE = '"+tableName+"'");
         public override bool CreateDatabase(string databaseName, string databaseDirectory = null)
         {
 
-            if (this.Context.Ado.IsValidConnection()) 
+            if (this.Context.Ado.IsValidConnection())
             {
                 return true;
             }
@@ -414,6 +424,17 @@ WHERE EVENT_OBJECT_TABLE = '"+tableName+"'");
                 if (ContainsCharSet("utf8mb4"))
                 {
                     createSql = createSql.Replace("utf8 COLLATE utf8_general_ci", "utf8mb4");
+                }
+                if (!string.IsNullOrEmpty(StaticConfig.CodeFirst_MySqlCollate))
+                {
+                    if (createSql.Contains(" COLLATE "))
+                    {
+                        createSql = $" {Regex.Split(createSql, " COLLATE ").First()} COLLATE  {StaticConfig.CodeFirst_MySqlCollate} ";
+                    }
+                    else
+                    {
+                        createSql += $" COLLATE  {StaticConfig.CodeFirst_MySqlCollate} ";
+                    }
                 }
                 newDb.Ado.ExecuteCommand(string.Format(createSql, databaseName, databaseDirectory));
             }
@@ -565,7 +586,7 @@ WHERE EVENT_OBJECT_TABLE = '"+tableName+"'");
 
         public override bool RenameColumn(string tableName, string oldColumnName, string newColumnName)
         {
-            var columns=GetColumnInfosByTableName(tableName).Where(it=>it.DbColumnName.Equals(oldColumnName,StringComparison.CurrentCultureIgnoreCase));
+            var columns=GetColumnInfosByTableName(tableName,false).Where(it=>it.DbColumnName.Equals(oldColumnName,StringComparison.CurrentCultureIgnoreCase));
             if (columns != null && columns.Any())
             {
                 var column = columns.First();

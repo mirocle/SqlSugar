@@ -65,7 +65,7 @@ namespace SqlSugar
             Before(sql);
             return sql;
         }
-        private void AutoRemoveDataCache()
+        protected void AutoRemoveDataCache()
         {
             var moreSetts = this.Context.CurrentConnectionConfig.MoreSettings;
             var extService = this.Context.CurrentConnectionConfig.ConfigureExternalServices;
@@ -204,7 +204,18 @@ namespace SqlSugar
             {
                 foreach (var columnInfo in this.EntityInfo.Columns)
                 {
-                    dataEvent(columnInfo.PropertyInfo.GetValue(item, null), new DataFilterModel() { OperationType = DataFilterType.InsertByObject, EntityValue = item, EntityColumnInfo = columnInfo });
+                    if (columnInfo.ForOwnsOnePropertyInfo != null)
+                    {
+                        var data = columnInfo.ForOwnsOnePropertyInfo.GetValue(item, null);
+                        if (data != null)
+                        {
+                            dataEvent(columnInfo.PropertyInfo.GetValue(data, null), new DataFilterModel() { OperationType = DataFilterType.InsertByObject, EntityValue = item, EntityColumnInfo = columnInfo });
+                        }
+                    }
+                    else
+                    {
+                        dataEvent(columnInfo.PropertyInfo.GetValue(item, null), new DataFilterModel() { OperationType = DataFilterType.InsertByObject, EntityValue = item, EntityColumnInfo = columnInfo });
+                    }
                 }
             }
         }
@@ -252,7 +263,7 @@ namespace SqlSugar
                 var isMapping = IsMappingColumns;
                 var columnInfo = new DbColumnInfo()
                 {
-                    Value = PropertyCallAdapterProvider<T>.GetInstance(column.PropertyName).InvokeGet(item),
+                    Value = GetValue(item,column),
                     DbColumnName = column.DbColumnName,
                     PropertyName = column.PropertyName,
                     PropertyType = UtilMethods.GetUnderType(column.PropertyInfo),
@@ -314,6 +325,22 @@ namespace SqlSugar
                     var value = disItem.Split(':').Last();
                     insertItem.Add(new DbColumnInfo() { DbColumnName = name, PropertyName = name, PropertyType = typeof(string), Value = value });
                 }
+            }
+        }
+        private static object GetValue(T item, EntityColumnInfo column)
+        {
+            if (column.ForOwnsOnePropertyInfo != null) 
+            {
+                var owsPropertyValue= column.ForOwnsOnePropertyInfo.GetValue(item, null);
+                return column.PropertyInfo.GetValue(owsPropertyValue, null);
+            }
+            if (StaticConfig.EnableAot)
+            {
+                return column.PropertyInfo.GetValue(item, null);
+            }
+            else
+            {
+                return PropertyCallAdapterProvider<T>.GetInstance(column.PropertyName).InvokeGet(item);
             }
         }
 

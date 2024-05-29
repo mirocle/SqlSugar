@@ -174,6 +174,10 @@ namespace SqlSugar
 
         public IInsertable<T> Insertable<T>(dynamic insertDynamicObject) where T : class, new()
         {
+            if (insertDynamicObject is IList<T>) 
+            {
+                return this.Context.Insertable<T>((insertDynamicObject as IList<T>).ToList());
+            }
             return this.Context.Insertable<T>(insertDynamicObject);
         }
 
@@ -263,22 +267,22 @@ namespace SqlSugar
         #endregion
 
         #region Union
-        public ISugarQueryable<T> Union<T>(List<ISugarQueryable<T>> queryables) where T : class, new()
+        public ISugarQueryable<T> Union<T>(List<ISugarQueryable<T>> queryables) where T : class 
         {
             return this.Context.Union(queryables);
         }
 
-        public ISugarQueryable<T> Union<T>(params ISugarQueryable<T>[] queryables) where T : class, new()
+        public ISugarQueryable<T> Union<T>(params ISugarQueryable<T>[] queryables) where T : class 
         {
             return this.Context.Union(queryables);
         }
 
-        public ISugarQueryable<T> UnionAll<T>(List<ISugarQueryable<T>> queryables) where T : class, new()
+        public ISugarQueryable<T> UnionAll<T>(List<ISugarQueryable<T>> queryables) where T : class 
         {
             return this.Context.UnionAll(queryables);
         }
 
-        public ISugarQueryable<T> UnionAll<T>(params ISugarQueryable<T>[] queryables) where T : class, new()
+        public ISugarQueryable<T> UnionAll<T>(params ISugarQueryable<T>[] queryables) where T : class 
         {
             return this.Context.UnionAll(queryables);
         }
@@ -526,6 +530,10 @@ namespace SqlSugar
             result.QueryBuilder.LambdaExpressions.ParameterIndex = (QueryBuilder.LambdaExpressions.ParameterIndex+ appendIndex);
             return result;
         }
+        public ISugarQueryable<T> Queryable<T>(ISugarQueryable<T> queryable,string shortName)
+        { 
+            return this.Context.Queryable(queryable,shortName);
+        }
 
         public ISugarQueryable<T> Queryable<T>(string shortName)
         {
@@ -563,6 +571,10 @@ namespace SqlSugar
         public IStorageable<T> Storageable<T>(List<T> dataList) where T : class, new()
         {
             return this.Context.Storageable(dataList);
+        }
+        public IStorageable<T> Storageable<T>(IList<T> dataList) where T : class, new()
+        {
+            return this.Context.Storageable(dataList.ToList());
         }
         public IStorageable<T> Storageable<T>(T[] dataList) where T : class, new()
         {
@@ -711,6 +723,10 @@ namespace SqlSugar
         {
             return this.Context.UpdateableByObject(singleEntityObjectOrListObject);
         }
+        public UpdateExpressionMethodInfo UpdateableByObject(Type entityType)
+        {
+            return this.Context.UpdateableByObject(entityType);
+        }
         public IUpdateable<T> Updateable<T>() where T : class, new()
         {
             return this.Context.Updateable<T>();
@@ -723,6 +739,10 @@ namespace SqlSugar
 
         public IUpdateable<T> Updateable<T>(dynamic updateDynamicObject) where T : class, new()
         {
+            if (updateDynamicObject is IList<T>) 
+            {
+                return this.Context.Updateable<T>((updateDynamicObject as IList<T>).ToList());
+            }
             return this.Context.Updateable<T>(updateDynamicObject);
         }
 
@@ -903,13 +923,13 @@ namespace SqlSugar
             var configId = attr.configId;
             return this.GetConnectionScope(configId);
         }
-        public SqlSugarProvider GetConnection(dynamic configId)
+        public SqlSugarProvider GetConnection(object configId)
         {
             InitTenant();
             var db = this._AllClients.FirstOrDefault(it =>Convert.ToString(it.ConnectionConfig.ConfigId) ==Convert.ToString(configId));
             if (db == null)
             {
-                Check.Exception(true, "ConfigId was not found {0}", configId);
+                Check.Exception(true, "ConfigId was not found {0}", configId+"");
             }
             if (db.Context == null)
             {
@@ -925,27 +945,31 @@ namespace SqlSugar
                 db.Context.Ado.BeginTran();
             }
             db.Context.Root = this;
+            if (db.Context.MappingTables == null) 
+            {
+                db.Context.MappingTables = new MappingTableList();
+            }
             return db.Context;
         }
 
-        public SqlSugarScopeProvider GetConnectionScope(dynamic configId)
+        public SqlSugarScopeProvider GetConnectionScope(object configId)
         {
             var conn = GetConnection(configId);
             return new SqlSugarScopeProvider(conn);
         }
-        public bool IsAnyConnection(dynamic configId)
+        public bool IsAnyConnection(object configId)
         {
             InitTenant();
             var db = this._AllClients.FirstOrDefault(it => Convert.ToString(it.ConnectionConfig.ConfigId) == Convert.ToString(configId));
             return db != null;
              
         }
-        public void ChangeDatabase(dynamic configId)
+        public void ChangeDatabase(object configId)
         {
             configId =Convert.ToString(configId);
             var isLog = _Context.Ado.IsEnableLogEvent;
-            Check.Exception(!_AllClients.Any(it =>Convert.ToString( it.ConnectionConfig.ConfigId) == configId), "ConfigId was not found {0}", configId);
-            InitTenant(_AllClients.First(it => Convert.ToString(it.ConnectionConfig.ConfigId )== configId));
+            Check.Exception(!_AllClients.Any(it =>Convert.ToString( it.ConnectionConfig.ConfigId) ==Convert.ToString( configId)), "ConfigId was not found {0}", configId+"");
+            InitTenant(_AllClients.First(it => Convert.ToString(it.ConnectionConfig.ConfigId )==Convert.ToString( configId)));
             if (this._IsAllTran)
                 this.Ado.BeginTran();
             if (this._IsOpen)
@@ -1542,11 +1566,15 @@ namespace SqlSugar
         }
         public IInsertable<T> InsertableWithAttr<T>(T insertObj) where T : class, new()
         {
-            return this.GetConnectionWithAttr<T>().Insertable(insertObj);
+            var result= this.GetConnectionWithAttr<T>().Insertable(insertObj);
+            result.InsertBuilder.IsWithAttr = true;
+            return result;
         }
         public IInsertable<T> InsertableWithAttr<T>(List<T> insertObjs) where T : class, new()
         {
-            return this.GetConnectionWithAttr<T>().Insertable(insertObjs);
+            var result= this.GetConnectionWithAttr<T>().Insertable(insertObjs);
+            result.InsertBuilder.IsWithAttr = true;
+            return result;
         }
         public IUpdateable<T> UpdateableWithAttr<T>(T updateObj) where T : class, new()
         {
