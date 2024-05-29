@@ -24,6 +24,8 @@ namespace SqlSugar
         string GetCsharpTypeName(string dbTypeName);
         string GetCsharpTypeNameByDbTypeName(string dbTypeName);
         List<KeyValuePair<string, CSharpDataType>> MappingTypes { get; }
+        // add by victor
+        List<string> RegMappingTypes { get; }
         List<T> DataReaderToList<T>(Type type, IDataReader reader);
         Task<List<T>> DataReaderToListAsync<T>(Type entityType, IDataReader dataReader);
         List<T> DataReaderToListNoUsing<T>(Type type, IDataReader reader);

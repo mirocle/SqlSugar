@@ -15,6 +15,10 @@ namespace SqlSugar
 
         void InitTables(string entitiesNamespace);
         void InitTables(string[] entitiesNamespaces);
+        // add by victor
+        void InitTables(string assemblyName, string entitiesNamespace);
+        // add by victor
+        void InitTables(Dictionary<string, string> namespaces);
         void InitTables(params Type[] entityTypes);
         void InitTablesWithAttr(params Type[] entityTypes);
         void InitTables(Type entityType);

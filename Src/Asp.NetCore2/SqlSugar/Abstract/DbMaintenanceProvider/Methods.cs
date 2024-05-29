@@ -683,7 +683,8 @@ namespace SqlSugar
             Check.Exception(columns.IsNullOrEmpty(), "No columns found ");
             foreach (var item in columns)
             {
-                string columnName = this.SqlBuilder.GetTranslationTableName(item.DbColumnName);
+                // edit by victor
+                string columnName = this.SqlBuilder.GetTranslationColumnName(item.DbColumnName);
                 string dataType = item.DataType;
                 string dataSize = GetSize(item);
                 string nullType = item.IsNullable ? this.CreateTableNull : CreateTableNotNull;

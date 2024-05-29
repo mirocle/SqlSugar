@@ -32,11 +32,26 @@ namespace SqlSugar
                 }
             }
         }
+
+        // add by victor
+        public override List<string> RegMappingTypes =>
+            new List<string>
+            {
+                @"uniqueidentifier",
+                @"varchar(\(\d+\)){1}",
+                @"nvarchar(\(\d+\)){1}",
+                @"char(\(\d+\)){1}"
+            };
+
         public static List<KeyValuePair<string, CSharpDataType>> MappingTypesConst = new List<KeyValuePair<string, CSharpDataType>>()
                 {
                   new KeyValuePair<string, CSharpDataType>("int",CSharpDataType.@int),
                   new KeyValuePair<string, CSharpDataType>("varchar",CSharpDataType.@string),
+                  // add by victor
+                  new KeyValuePair<string, CSharpDataType>("varchar(max)",CSharpDataType.@string),
                   new KeyValuePair<string, CSharpDataType>("nvarchar",CSharpDataType.@string),
+                  // add by victor
+                  new KeyValuePair<string, CSharpDataType>("nvarchar(max)",CSharpDataType.@string),
                   new KeyValuePair<string, CSharpDataType>("sql_variant",CSharpDataType.@string),
                   new KeyValuePair<string, CSharpDataType>("varcharmax",CSharpDataType.@string),
                   new KeyValuePair<string, CSharpDataType>("text",CSharpDataType.@string),

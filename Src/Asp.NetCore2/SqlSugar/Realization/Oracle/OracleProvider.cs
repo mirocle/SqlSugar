@@ -144,7 +144,7 @@ namespace SqlSugar
                         }
                         else if(Parameter.ParameterName.ToLower().IsContainsIn(KeyWord))
                         {
-                            Check.ExceptionEasy($" {Parameter.ParameterName} is key word", $"{Parameter.ParameterName}ÊÇ¹Ø¼ü´Ê");
+                            Check.ExceptionEasy($" {Parameter.ParameterName} is key word", $"{Parameter.ParameterName}æ˜¯å…³é”®è¯");
                         }
                     }
                 }
@@ -176,9 +176,9 @@ namespace SqlSugar
             {
                 base.ErrorEvent(it);
             }
-            if (it.Message != null && it.Message.Contains("ÎŞĞ§µÄÖ÷»ú/°ó¶¨±äÁ¿Ãû"))
+            if (it.Message != null && it.Message.Contains("æ— æ•ˆçš„ä¸»æœº/ç»‘å®šå˜é‡å"))
             {
-                Check.ExceptionEasy(it.Message, $"´íÎó£º{it.Message}£¬³öÏÖÕâ¸ö´íµÄÔ­Òò£º 1.¿ÉÄÜÊÇ²ÎÊıÃûÎª¹Ø¼ü´Ê£¨ÀıÈç @user £©2. SQL´íÎó¡£");
+                Check.ExceptionEasy(it.Message, $"é”™è¯¯ï¼š{it.Message}ï¼Œå‡ºç°è¿™ä¸ªé”™çš„åŸå› ï¼š 1.å¯èƒ½æ˜¯å‚æ•°åä¸ºå…³é”®è¯ï¼ˆä¾‹å¦‚ @user ï¼‰2. SQLé”™è¯¯ã€‚");
             } 
         };
         public override void SetCommandToAdapter(IDataAdapter dataAdapter, DbCommand command)

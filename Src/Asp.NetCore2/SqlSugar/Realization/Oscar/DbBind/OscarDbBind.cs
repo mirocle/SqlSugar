@@ -52,6 +52,11 @@ namespace SqlSugar
                 return propertyTypes.First().Value.ToString();
             }
         }
+
+        // add by victor
+        public override List<string> RegMappingTypes =>
+            new List<string>();
+
         public override List<KeyValuePair<string, CSharpDataType>> MappingTypes
         {
             get

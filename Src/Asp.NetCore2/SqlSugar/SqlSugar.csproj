@@ -1,16 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
-    <Version>5.1.4.113</Version>
-    <Copyright>sun_kai_xuan</Copyright>
-    <PackageProjectUrl>https://github.com/sunkaixuan/SqlSugar</PackageProjectUrl>
-    <PackageLicenseUrl></PackageLicenseUrl>
-    <PackageIconUrl></PackageIconUrl>
-    <PackageId>SqlSugar</PackageId>
-    <Description>果糖大数据科技（南通）有限公司</Description>
-    <Company>果糖大数据科技（南通）有限公司</Company>
-    <Authors>果糖大数据科技（南通）有限公司</Authors>
+      <TargetFramework>netstandard2.1</TargetFramework>
+      <Version>1.4.2</Version>
+      <Copyright>盟拓</Copyright>
+      <PackageProjectUrl>
+      </PackageProjectUrl>
+      <PackageLicenseUrl>
+      </PackageLicenseUrl>
+      <PackageIconUrl>
+      </PackageIconUrl>
+      <PackageId>MT.SqlSugar</PackageId>
+      <Description>盟拓内部修改版，引用版本5.1.4.114 </Description>
+      <Company>盟拓</Company>
+      <Authors>盟拓</Authors>
+      <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,9 +33,12 @@
     <PackageReference Include="SqlSugarCore.Dm" Version="1.2.0" />
     <PackageReference Include="SqlSugarCore.Kdbndp" Version="7.4.0" />
     <PackageReference Include="System.Data.Common" Version="4.3.0" />
-	<PackageReference Include="Microsoft.Data.SqlClient" Version="2.1.4" />
+	<PackageReference Include="Microsoft.Data.SqlClient" Version="5.1.1" />
 	<PackageReference Include="System.Data.OleDb" Version="6.0.0" />
     <PackageReference Include="System.Reflection.Emit.Lightweight" Version="4.3.0" />
   </ItemGroup>
-
+    <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+        <Exec Command="rm -f ./bin/Debug/*.nupkg" Condition="'$(OS)' == 'Unix'" />
+        <Exec Command="del .\bin\Debug\*.nupkg" Condition="'$(OS)' == 'Windows_NT'" />
+    </Target>
 </Project>

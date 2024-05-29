@@ -25,6 +25,11 @@ namespace SqlSugar
             var mappings = this.MappingTypes.Where(it => it.Value.ToString().Equals(csharpTypeName, StringComparison.CurrentCultureIgnoreCase));
             return mappings.HasValue() ? mappings.First().Key : "varchar";
         }
+
+        // add by victor
+        public override List<string> RegMappingTypes =>
+            new List<string>();
+
         public override string GetPropertyTypeName(string dbTypeName)
         {
             dbTypeName = dbTypeName.ToLower();

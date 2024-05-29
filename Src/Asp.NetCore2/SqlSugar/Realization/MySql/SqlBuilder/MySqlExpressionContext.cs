@@ -195,7 +195,8 @@ namespace SqlSugar
 
         public override string CharIndex(MethodCallExpressionModel model)
         {
-            return string.Format("instr ({0},{1})", model.Args[0].MemberName, model.Args[1].MemberName);
+            // edit by victor
+            return string.Format("instr ({0},{1})", model.Args[1].MemberName, model.Args[0].MemberName);
         }
 
         public override string JsonField(MethodCallExpressionModel model)

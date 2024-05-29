@@ -458,7 +458,8 @@ WHERE EVENT_OBJECT_TABLE = '" + tableName + "'");
                 if (item.ColumnDescription != null)
                 {
                     var mySqlCodeFirst = this.Context.CodeFirst as MySqlCodeFirst;
-                    if (item.UnderType == UtilConstants.GuidType && item.Length == 0)
+                    // edit by victor
+                    if (item.UnderType == UtilConstants.GuidType&&item.Length==0 && !item.DataType.Contains("(")) 
                     {
                         item.Length = 36;
                     }

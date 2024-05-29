@@ -61,6 +61,8 @@ namespace SqlSugar
 
         SplitInsertable<T> SplitTable();
         SplitInsertable<T> SplitTable(SplitType splitType);
+        // add by victor 20230308
+        SplitInsertable<T> SplitTable(string splitColumnName);
         void AddQueue();
         IInsertable<T> MySqlIgnore();
         IInsertable<T> OffIdentity();

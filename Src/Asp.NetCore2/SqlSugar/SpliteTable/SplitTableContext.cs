@@ -92,6 +92,11 @@ namespace SqlSugar
         {
             return Service.GetFieldValue(this.Context,EntityInfo, splitType, entityValue);
         }
+        // add by victor 20230308
+        public object GetValue(SplitType splitType, object entityValue, string splitColumnName)
+        {
+            return Service.GetFieldValue(this.Context,EntityInfo, splitType, entityValue, splitColumnName);
+        }
         internal void CheckPrimaryKey()
         {
             Check.Exception(EntityInfo.Columns.Any(it => it.IsIdentity == true), ErrorMessage.GetThrowMessage("Split table can't IsIdentity=true", "分表禁止使用自增列"));

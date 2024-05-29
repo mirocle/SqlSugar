@@ -341,7 +341,8 @@ namespace SqlSugar
         private static void GetValueTypeList<T>(Type type, IDataReader dataReader, List<T> result)
         {
             var value = dataReader.GetValue(0);
-            if (type == UtilConstants.GuidType)
+            // edit by victor
+            if (type == UtilConstants.GuidType || type == UtilConstants.GuidTypeNull)
             {
                 value = Guid.Parse(value.ToString());
             }

@@ -86,6 +86,11 @@ namespace SqlSugar
                 }
             }
         }
+
+        // add by victor
+        public override List<string> RegMappingTypes =>
+            new List<string>();
+
         public static List<KeyValuePair<string, CSharpDataType>> MappingTypesConst = new List<KeyValuePair<string, CSharpDataType>>()
                 {
                   new KeyValuePair<string, CSharpDataType>("int",CSharpDataType.@int),

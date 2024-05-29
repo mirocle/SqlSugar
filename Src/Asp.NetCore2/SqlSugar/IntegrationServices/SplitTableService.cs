@@ -88,6 +88,40 @@ namespace SqlSugar
                 }
             }
         }
+        
+        // add by victor 20230308
+        public virtual object GetFieldValue(ISqlSugarClient db, EntityInfo entityInfo, SplitType splitType, object entityValue, string splitColumnName)
+        {
+            var splitColumn = entityInfo.Columns.FirstOrDefault(it => it.PropertyName.Equals(splitColumnName, StringComparison.OrdinalIgnoreCase));
+            if (splitColumn == null)
+            {
+                return db.GetDate();
+            }
+            else
+            {
+                if (entityValue == null) 
+                {
+                    return null;
+                }
+                var value = splitColumn.PropertyInfo.GetValue(entityValue, null);
+                if (value == null)
+                {
+                    return db.GetDate();
+                }
+                else if (UtilMethods.GetUnderType(value.GetType()) != UtilConstants.DateType)
+                {
+                    throw new Exception($"DateSplitTableService Split column {splitColumn.PropertyName} not DateTime " + splitType.ToString());
+                }
+                else if (Convert.ToDateTime(value) == DateTime.MinValue)
+                {
+                    return db.GetDate();
+                }
+                else
+                {
+                    return value;
+                }
+            }
+        }
         public void VerifySplitType(SplitType splitType)
         {
             switch (splitType)

@@ -720,6 +720,40 @@ namespace SqlSugar
             result.Inserable = this;
             return result;
         }
+        
+        // add by victor 20230308
+        public SplitInsertable<T> SplitTable(string splitColumnName)
+        {
+            var splitTableAttribute = typeof(T).GetCustomAttribute<SplitTableAttribute>();
+            if (splitTableAttribute == null)
+            {
+                Check.Exception(true,$" {typeof(T).Name} need SplitTableAttribute");
+                return null;
+            }
+
+            var splitType = splitTableAttribute.SplitType;
+            SplitTableContext helper = new SplitTableContext(Context)
+            {
+                EntityInfo = this.EntityInfo
+            };
+            helper.CheckPrimaryKey();
+            SplitInsertable<T> result = new SplitInsertable<T>
+            {
+                Context = this.Context,
+                EntityInfo = this.EntityInfo,
+                Helper = helper,
+                SplitType = splitType,
+                TableNames = new List<KeyValuePair<string, object>>()
+            };
+            foreach (var item in this.InsertObjs)
+            {
+                var splitFieldValue = helper.GetValue(splitType, item, splitColumnName);
+                var tableName=helper.GetTableName(splitType, splitFieldValue);
+                result.TableNames.Add(new KeyValuePair<string, object>(tableName,item));
+            }
+            result.Inserable = this;
+            return result;
+        }
 
         public SplitInsertable<T> SplitTable()
         {

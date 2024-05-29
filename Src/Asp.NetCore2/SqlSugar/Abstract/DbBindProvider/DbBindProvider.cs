@@ -13,6 +13,8 @@ namespace SqlSugar
         #region Properties
         public virtual SqlSugarProvider Context { get; set; }
         public abstract List<KeyValuePair<string, CSharpDataType>> MappingTypes { get; }
+        // add by victor
+        public abstract List<string> RegMappingTypes { get; }
         #endregion
 
         #region Public methods

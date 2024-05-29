@@ -42,6 +42,16 @@ namespace SqlSugar
                 }
             }
         }
+
+        // add by victor
+        public override List<string> RegMappingTypes =>
+            new List<string>
+            {
+                @"datetime\(\d{1}\)",
+                @"varchar(\(\d+\)){1}",
+                @"char(\(\d+\)){1}"
+            };
+
         public static List<KeyValuePair<string, CSharpDataType>> MappingTypesConst = new List<KeyValuePair<string, CSharpDataType>>(){
 
                     new KeyValuePair<string, CSharpDataType>("int",CSharpDataType.@int),

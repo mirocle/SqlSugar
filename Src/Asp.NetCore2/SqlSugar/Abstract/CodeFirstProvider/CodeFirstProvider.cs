@@ -144,6 +144,21 @@ namespace SqlSugar
                 }
             }
         }
+        // add by victor
+        public virtual void InitTables(string assemblyName, string entitiesNamespace)
+        {
+            var types = Assembly.Load(assemblyName).GetTypes().Where(t => t.Namespace == entitiesNamespace).ToArray();
+            InitTables(types);
+        }
+
+        // add by victor
+        public virtual void InitTables(Dictionary<string, string> namespaces)
+        {
+            foreach (var keyValueNamespace in namespaces)
+            {
+                InitTables(keyValueNamespace.Key, keyValueNamespace.Value);
+            }
+        }        
         public ICodeFirst As(Type type, string newTableName) 
         {
             if (!MappingTables.ContainsKey(type)) 
@@ -270,14 +285,21 @@ namespace SqlSugar
                     {
                         var types = item.DataType.Split(',').Select(it => it.ToLower()).ToList();
                         var mapingTypes = this.Context.Ado.DbBind.MappingTypes.Select(it => it.Key.ToLower()).ToList();
-                        var mappingType = types.FirstOrDefault(it => mapingTypes.Contains(it));
-                        if (mappingType != null)
+                        // var mappingType = types.FirstOrDefault(it => mapingTypes.Any(it.StartsWith));
+                        // edit by victor
+                        var mappingType = types.Where(it => this.Context.Ado.DbBind.RegMappingTypes.Any(mt => Regex.IsMatch(it, mt))).ToList();
+                        if (mappingType.Any())
                         {
-                            item.DataType = mappingType;
+                            item.DataType = mappingType.First();
                         }
-                        if (item.DataType == "varcharmax") 
+                        // add by victor
+                        else
                         {
-                            item.DataType = "nvarchar(max)";
+                            mappingType = types.Where(it => mapingTypes.Contains(it)).ToList();
+                            if (mappingType.Any())
+                            {
+                                item.DataType = mappingType.First();
+                            }
                         }
                     }
                 }
